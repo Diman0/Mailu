@@ -16,32 +16,7 @@ on:
       - trying
 
 #All jobs that will run for this workflow.
-#First job downloads the cached clamav db file and updates it if required. 
-#This prevents us from spamming clamav db update server and being rate trottled.
 jobs:
-  cache-clamav-db:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest    
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
-      #Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
-
-      - name: 'setup cvd update Download clamav db'
-        run: python3 -m pip install --user cvdupdate
-      - name: 'Download clamav db artifact if available'
-        uses: actions/download-artifact@v2
-        with:
-          name: clamav-db
-          path: ~/.cvdupdate/database/main.cvd
-      - name: 'Update the clamav av db file'
-        run: python -m cvdupdate update    
-      - name: 'Upload clamav db Artifact'
-        uses: actions/upload-artifact@v2
-        with:
-          name: clamav-db
-          path: ~/.cvdupdate/database/main.cvd
-
 #For now all tests do NOt run in parallel. They all run sequentially in one job.
 #In the future we can use docker-save docker-restore and the action cache,
 #to create parallel jobs. Cache (https://github.com/actions/cache) can be used 
@@ -50,8 +25,6 @@ jobs:
     name: tests
     runs-on: ubuntu-latest
     #depends on the clamav db file being updated
-    needs:
-      - cache-clamav-db
     steps:
       - uses: actions/checkout@v2
       - name: check docker-compose version
@@ -67,17 +40,7 @@ jobs:
           TRAVIS_BRANCH: ${{ env.GITHUB_REF }}
         run: docker-compose -f tests/build.yml build
       - name: copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: 'Download clamav db artifact if available'
-        uses: actions/download-artifact@v2
-        with:
-          name: clamav-db
-          path: /mailu/filter/main.cvd
-      - name: 'test clamvav'
-        run: python tests/compose/test.py filters 10
-        env:
-          MAILU_VERSION: ${{ env.GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
+        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'      
       - name: test core suite
         run: python tests/compose/test.py core 1
         env:
@@ -88,11 +51,17 @@ jobs:
         env:
           MAILU_VERSION: ${{ env.GITHUB_REF }}
           TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
-      - name: test clamav
-        run: travis_wait python tests/compose/test.py filters 10
+      #very important step that caches the mailu database files!
+      - name: 'Cache clamav DB'
+        uses: actions/cache@v2
+        with:
+          path: /mailu/filter/
+          key: clamav-db
+      - name: 'test clamvav'
+        run: python tests/compose/test.py filters 10
         env:
           MAILU_VERSION: ${{ env.GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }} 
       - name: test rainloop
         run: python tests/compose/test.py rainloop 1
         env:
