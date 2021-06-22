@@ -37,7 +37,7 @@ jobs:
         with:
           name: clamav-db
           path: ~/.cvdupdate/database/main.cvd
-      - name: 'Update the clamav av db file
+      - name: 'Update the clamav av db file'
         run: python -m cvdupdate update    
       - name: 'Upload clamav db Artifact'
         uses: actions/upload-artifact@v2
