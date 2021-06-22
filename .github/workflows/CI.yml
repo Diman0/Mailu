@@ -50,6 +50,8 @@ jobs:
 #to create parallel jobs. Cache (https://github.com/actions/cache) can be used 
 #to share the build images between all jobs :)
   tests:
+    name: tests
+    runs-on: ubuntu-latest
     #depends on the clamav db file being updated
     needs:
       - cache-clamav-db
@@ -75,7 +77,7 @@ jobs:
         run: python tests/compose/test.py core 1
       - name: test fetch
         run: python tests/compose/test.py fetchmail 1
-      - name test clamav
+      - name: test clamav
         run: travis_wait python tests/compose/test.py filters 10
       - name: test rainloop
         run: python tests/compose/test.py rainloop 1
@@ -90,6 +92,7 @@ jobs:
 #Perhaps we could make use of caching. The limit is 5GB for the cache
 #https://github.com/actions/cache
   deploy:
+    name: deploy
     needs:
       - tests
     runs-on: ubuntu-latest
