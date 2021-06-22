@@ -27,6 +27,8 @@ jobs:
     #depends on the clamav db file being updated
     steps:
       - uses: actions/checkout@v2
+      - name: install python packages
+        run: python3 -m pip install -r tests/requirements.txt
       - name: check docker-compose version
         run: docker-compose -v
       - name: login docker
