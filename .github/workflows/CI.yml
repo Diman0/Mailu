@@ -76,38 +76,38 @@ jobs:
       - name: 'test clamvav'
         run: python tests/compose/test.py filters 10
         env:
-          MAILU_VERSION: ${{ env.$GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
+          MAILU_VERSION: ${{ env.GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
       - name: test core suite
         run: python tests/compose/test.py core 1
         env:
-          MAILU_VERSION: ${{ env.$GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
+          MAILU_VERSION: ${{ env.GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
       - name: test fetch
         run: python tests/compose/test.py fetchmail 1
         env:
-          MAILU_VERSION: ${{ env.$GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
+          MAILU_VERSION: ${{ env.GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
       - name: test clamav
         run: travis_wait python tests/compose/test.py filters 10
         env:
-          MAILU_VERSION: ${{ env.$GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
+          MAILU_VERSION: ${{ env.GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
       - name: test rainloop
         run: python tests/compose/test.py rainloop 1
         env:
-          MAILU_VERSION: ${{ env.$GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
+          MAILU_VERSION: ${{ env.GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
       - name: test roundcube
         run: python tests/compose/test.py roundcube 1
         env:
-          MAILU_VERSION: ${{ env.$GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
+          MAILU_VERSION: ${{ env.GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
       - name: test webdav
         run: python tests/compose/test.py webdav 1
         env:
-          MAILU_VERSION: ${{ env.$GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
+          MAILU_VERSION: ${{ env.GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
 
 #Must be changed in the future. With travis, the deploy script shared the build context.
 #now we rebuild all images what takes time. We must investigate if we can somehow share 
@@ -131,14 +131,14 @@ jobs:
       - name: build all docker images
         run: docker-compose -f tests/build.yml build
         env:
-          MAILU_VERSION: ${{ env.$GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
+          MAILU_VERSION: ${{ env.GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}        
       - name: deploy build docker images
         env:
           DOCKER_UN: ${{ secrets.Docker_Login }}
           DOCKER_PW: ${{ secrets.Docker_Password }}
-          MAILU_VERSION: ${{ env.$GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}          
+          MAILU_VERSION: ${{ env.GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}          
         run: bash tests/deploy.sh
 
  # This job should depend on all required jobs.
