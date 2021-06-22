@@ -63,8 +63,8 @@ jobs:
         run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
       - name: build all docker images
         env:
-          MAILU_VERSION: ${{ env.$GITHUB_REF }}
-          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}
+          MAILU_VERSION: ${{ env.GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.GITHUB_REF }}
         run: docker-compose -f tests/build.yml build
       - name: copy all certs
         run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
