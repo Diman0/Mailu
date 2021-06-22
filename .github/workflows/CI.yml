@@ -15,8 +15,8 @@ on:
       - staging
       - trying
 env:
-  MAILU_VERSION: ${{$GITHUB_REF}}
-  TRAVIS_BRANCH: ${{$GITHUB_REF}}
+  MAILU_VERSION: ${{ env.$GITHUB_REF }}
+  TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}
 
 #All jobs that will run for this workflow.
 #First job downloads the cached clamav db file and updates it if required. 
