@@ -22,10 +22,6 @@ jobs:
   cache-clamav-db:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest    
-    env:
-      MAILU_VERSION: ${{ env.$GITHUB_REF }}
-      TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}
-
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       #Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -53,10 +49,6 @@ jobs:
   tests:
     name: tests
     runs-on: ubuntu-latest
-    env:
-      MAILU_VERSION: ${{ env.$GITHUB_REF }}
-      TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}
-
     #depends on the clamav db file being updated
     needs:
       - cache-clamav-db
@@ -70,6 +62,9 @@ jobs:
           DOCKER_PW: ${{ secrets.Docker_Password }}
         run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
       - name: build all docker images
+        env:
+          MAILU_VERSION: ${{ env.$GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}
         run: docker-compose -f tests/build.yml build
       - name: copy all certs
         run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
@@ -78,18 +73,41 @@ jobs:
         with:
           name: clamav-db
           path: /mailu/filter/main.cvd
+      - name: 'test clamvav'
+        run: python tests/compose/test.py filters 10
+        env:
+          MAILU_VERSION: ${{ env.$GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
       - name: test core suite
         run: python tests/compose/test.py core 1
+        env:
+          MAILU_VERSION: ${{ env.$GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
       - name: test fetch
         run: python tests/compose/test.py fetchmail 1
+        env:
+          MAILU_VERSION: ${{ env.$GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
       - name: test clamav
         run: travis_wait python tests/compose/test.py filters 10
+        env:
+          MAILU_VERSION: ${{ env.$GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
       - name: test rainloop
         run: python tests/compose/test.py rainloop 1
+        env:
+          MAILU_VERSION: ${{ env.$GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
       - name: test roundcube
         run: python tests/compose/test.py roundcube 1
+        env:
+          MAILU_VERSION: ${{ env.$GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
       - name: test webdav
         run: python tests/compose/test.py webdav 1
+        env:
+          MAILU_VERSION: ${{ env.$GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
 
 #Must be changed in the future. With travis, the deploy script shared the build context.
 #now we rebuild all images what takes time. We must investigate if we can somehow share 
@@ -98,9 +116,6 @@ jobs:
 #https://github.com/actions/cache
   deploy:
     name: deploy
-    env:
-      MAILU_VERSION: ${{ env.$GITHUB_REF }}
-      TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}
     needs:
       - tests
     runs-on: ubuntu-latest
@@ -115,10 +130,15 @@ jobs:
         run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
       - name: build all docker images
         run: docker-compose -f tests/build.yml build
+        env:
+          MAILU_VERSION: ${{ env.$GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}        
       - name: deploy build docker images
         env:
           DOCKER_UN: ${{ secrets.Docker_Login }}
           DOCKER_PW: ${{ secrets.Docker_Password }}
+          MAILU_VERSION: ${{ env.$GITHUB_REF }}
+          TRAVIS_BRANCH: ${{ env.$GITHUB_REF }}          
         run: bash tests/deploy.sh
 
  # This job should depend on all required jobs.
