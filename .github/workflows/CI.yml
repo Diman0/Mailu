@@ -60,7 +60,7 @@ jobs:
           path: /mailu/filter/
           key: clamav-db
       - name: 'test clamvav'
-        run: python tests/compose/test.py filters 10
+        run: python tests/compose/test.py filters 2
         env:
           MAILU_VERSION: ${{ env.GITHUB_REF }}
           TRAVIS_BRANCH: ${{ env.GITHUB_REF }} 
@@ -90,6 +90,8 @@ jobs:
     needs:
       - tests
     runs-on: ubuntu-latest
+    env:
+      DOCKER_ORG: diman0
     steps: 
       - uses: actions/checkout@v2
       - name: check docker-compose version
