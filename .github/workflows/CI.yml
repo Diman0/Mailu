@@ -1,0 +1,127 @@
+
+
+name: CI
+on:
+  ## Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  #trigger on pull request for staging and trying
+  pull_request:
+      branches:
+      - staging
+      - trying
+  #on push on staging and trying
+  push:
+    branches:
+      - staging
+      - trying
+env:
+  MAILU_VERSION: ${{$GITHUB_REF}}
+  TRAVIS_BRANCH: ${{$GITHUB_REF}}
+
+#All jobs that will run for this workflow.
+#First job downloads the cached clamav db file and updates it if required. 
+#This prevents us from spamming clamav db update server and being rate trottled.
+jobs:
+  cache-clamav-db:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest    
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      #Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      - name: 'setup cvd update Download clamav db'
+        run: python3 -m pip install --user cvdupdate
+      - name: 'Download clamav db artifact if available'
+        uses: actions/download-artifact@v2
+        with:
+          name: clamav-db
+          path: ~/.cvdupdate/database/main.cvd
+      - name: 'Update the clamav av db file
+        run: python -m cvdupdate update    
+      - name: 'Upload clamav db Artifact'
+        uses: actions/upload-artifact@v2
+        with:
+          name: clamav-db
+          path: ~/.cvdupdate/database/main.cvd
+
+#For now all tests do NOt run in parallel. They all run sequentially in one job.
+#In the future we can use docker-save docker-restore and the action cache,
+#to create parallel jobs. Cache (https://github.com/actions/cache) can be used 
+#to share the build images between all jobs :)
+  tests:
+    #depends on the clamav db file being updated
+    needs:
+      - cache-clamav-db
+    steps:
+      - uses: actions/checkout@v2
+      - name: check docker-compose version
+        run: docker-compose -v
+      - name: login docker
+        env:
+          DOCKER_UN: ${{ secrets.Docker_Login }}
+          DOCKER_PW: ${{ secrets.Docker_Password }}
+        run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
+      - name: build all docker images
+        run: docker-compose -f tests/build.yml build
+      - name: copy all certs
+        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
+      - name: 'Download clamav db artifact if available'
+        uses: actions/download-artifact@v2
+        with:
+          name: clamav-db
+          path: /mailu/filter/main.cvd
+      - name: test core suite
+        run: python tests/compose/test.py core 1
+      - name: test fetch
+        run: python tests/compose/test.py fetchmail 1
+      - name test clamav
+        run: travis_wait python tests/compose/test.py filters 10
+      - name: test rainloop
+        run: python tests/compose/test.py rainloop 1
+      - name: test roundcube
+        run: python tests/compose/test.py roundcube 1
+      - name: test webdav
+        run: python tests/compose/test.py webdav 1
+
+#Must be changed in the future. With travis, the deploy script shared the build context.
+#now we rebuild all images what takes time. We must investigate if we can somehow share 
+#the build context between job tests and job deploy. 
+#Perhaps we could make use of caching. The limit is 5GB for the cache
+#https://github.com/actions/cache
+  deploy:
+    needs:
+      - tests
+    runs-on: ubuntu-latest
+    steps: 
+      - uses: actions/checkout@v2
+      - name: check docker-compose version
+        run: docker-compose -v
+      - name: login docker
+        env:
+          DOCKER_UN: ${{ secrets.Docker_Login }}
+          DOCKER_PW: ${{ secrets.Docker_Password }}
+        run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
+      - name: build all docker images
+        run: docker-compose -f tests/build.yml build
+      - name: deploy build docker images
+        env:
+          DOCKER_UN: ${{ secrets.Docker_Login }}
+          DOCKER_PW: ${{ secrets.Docker_Password }}
+        run: bash tests/deploy.sh
+
+ # This job should depend on all required jobs.
+ # We will make Bors watch this job to tell whether to merge or not.
+  ci-success:
+    name: CI-Done
+    #Returns true when none of the **previous** steps have failed or been canceled.
+    if: ${{ success() }}
+    needs: 
+      - tests
+      - deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: CI succeeded.
+        run: exit 0
+
+
