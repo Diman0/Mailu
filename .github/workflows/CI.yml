@@ -22,11 +22,11 @@ on:
       - '1.8'
       - master
       # version tags, e.g. 1.7.1
-      - /^1\.[5678]\.\d+$/
+      - '[1-9].[0-9].[0-9]'
       # pre-releases, e.g. 1.8-pre1
-      - /^1\.8-pre\d+$/
+      - 1.8-pre[0-9]
     # test branches, e.g. test-debian
-      - /^test-[\w\-\.]+$/
+      - test-*
 
 #All jobs that will run for this workflow.
 jobs:
