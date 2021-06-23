@@ -142,7 +142,8 @@ jobs:
           DOCKER_PW: ${{ secrets.Docker_Password }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
           MAILU_VERSION: ${{ env.BRANCH }}
-          TRAVIS_BRANCH: ${{ env.BRANCH }}               
+          TRAVIS_BRANCH: ${{ env.BRANCH }}
+          TRAVIS_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: bash tests/deploy.sh
 
  # This job should depend on all required jobs.
