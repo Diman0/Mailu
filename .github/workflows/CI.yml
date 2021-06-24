@@ -82,7 +82,7 @@ jobs:
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
       - name: Hack to prevent permissions issue bug of actions/cache
         run: |
-          sudo mkdir /mailu/filter
+          sudo mkdir -p /mailu/filter
           sudo chmod -R a+rwx /mailu/filter
       #very important step that caches the mailu database files!
       - name: 'Cache clamav DB'
