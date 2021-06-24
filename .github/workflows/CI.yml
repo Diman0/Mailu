@@ -55,12 +55,7 @@ jobs:
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
         run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
       - name: create folder for storing/caching images
-        run: mkdir images     
-      - name: Cache docker images
-        uses: actions/cache@v2
-        with:
-          path: images/images.tar.gz
-          key: docker-images-${{ env.BRANCH }}-${{ github.sha }}-${{ github.run_id }}     
+        run: mkdir images        
       # In this step, this action saves a list of existing images,
       # the cache is created without them in the post run.
       # It also restores the cache if it exists.
@@ -73,10 +68,6 @@ jobs:
           TRAVIS_BRANCH: ${{ env.BRANCH }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
         run: docker-compose -f tests/build.yml build
-      - name: save all docker images for reusage
-        env:
-          DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
-        run: docker save $DOCKER_ORG/admin $DOCKER_ORG/clamav $DOCKER_ORG/docs $DOCKER_ORG/dovecot $DOCKER_ORG/fetchmail $DOCKER_ORG/nginx $DOCKER_ORG/none $DOCKER_ORG/postfix $DOCKER_ORG/postgresql $DOCKER_ORG/radicale $DOCKER_ORG/rainloop $DOCKER_ORG/roundcube $DOCKER_ORG/rspamd $DOCKER_ORG/setup $DOCKER_ORG/traefik-certdumper $DOCKER_ORG/unbound -o images/images.tar.gz 
       - name: copy all certs
         run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'      
       - name: test core suite
@@ -146,23 +137,10 @@ jobs:
           DOCKER_UN: ${{ secrets.Docker_Login }}
           DOCKER_PW: ${{ secrets.Docker_Password }}
         run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
-      - name: create folder for storing/caching images
-        run: mkdir images
-      - name: Cache docker images
-        id: cache
-        uses: actions/cache@v2
-        with:
-          path: images/images.tar.gz
-          key: docker-images-${{ env.BRANCH }}-${{ github.sha }}-${{ github.run_id }}
-      - name: Load docker images
-        if: steps.cache.outputs.cache-hit == 'true'
-        run: docker load -i images/images.tar.gz
       - uses: satackey/action-docker-layer-caching@v0.0.11
-        if: steps.cache.outputs.cache-hit != 'true'
        # Ignore the failure of a step and avoid terminating the job.
         continue-on-error: true        
       - name: build all docker images
-        if: steps.cache.outputs.cache-hit != 'true'
         run: docker-compose -f tests/build.yml build
         env:
           MAILU_VERSION: ${{ env.BRANCH }}
