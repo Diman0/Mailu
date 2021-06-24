@@ -60,7 +60,15 @@ jobs:
         uses: actions/cache@v2
         with:
           path: images/images.tar.gz
-          key: docker-images-${{ env.BRANCH }}-${{ github.sha }}-${{ github.run_id }}   
+          key: docker-images-${{ env.BRANCH }}-${{ github.sha }}-${{ github.run_id }}
+      - name: pull docker images for building
+      
+      # In this step, this action saves a list of existing images,
+      # the cache is created without them in the post run.
+      # It also restores the cache if it exists.
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+       # Ignore the failure of a step and avoid terminating the job.
+        continue-on-error: true
       - name: build all docker images
         env:
           MAILU_VERSION: ${{ env.BRANCH }}
@@ -68,6 +76,8 @@ jobs:
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
         run: docker-compose -f tests/build.yml build
       - name: save all docker images for reusage
+        env:
+          DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
         run: docker save $DOCKER_ORG/admin $DOCKER_ORG/clamav $DOCKER_ORG/docs $DOCKER_ORG/dovecot $DOCKER_ORG/fetchmail $DOCKER_ORG/nginx $DOCKER_ORG/none $DOCKER_ORG/postfix $DOCKER_ORG/postgresql $DOCKER_ORG/radicale $DOCKER_ORG/rainloop $DOCKER_ORG/roundcube $DOCKER_ORG/rspamd $DOCKER_ORG/setup $DOCKER_ORG/traefik-certdumper $DOCKER_ORG/unbound -o images/images.tar.gz 
       - name: copy all certs
         run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'      
@@ -149,6 +159,10 @@ jobs:
       - name: Load docker images
         if: steps.cache.outputs.cache-hit == 'true'
         run: docker load -i images/images.tar.gz
+      - uses: satackey/action-docker-layer-caching@v0.0.11
+        if: steps.cache.outputs.cache-hit != 'true'
+       # Ignore the failure of a step and avoid terminating the job.
+        continue-on-error: true        
       - name: build all docker images
         if: steps.cache.outputs.cache-hit != 'true'
         run: docker-compose -f tests/build.yml build
