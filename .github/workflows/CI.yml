@@ -34,8 +34,8 @@ jobs:
 #to share the build images between all jobs :)
 
 
-  tests:
-    name: build and test
+  build-test-deploy:
+    name: build and test and deploy
     runs-on: ubuntu-latest
     #depends on the clamav db file being updated
     steps:
@@ -53,9 +53,7 @@ jobs:
           DOCKER_UN: ${{ secrets.Docker_Login }}
           DOCKER_PW: ${{ secrets.Docker_Password }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
-        run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
-      - name: create folder for storing/caching images
-        run: mkdir images        
+        run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin      
       # In this step, this action saves a list of existing images,
       # the cache is created without them in the post run.
       # It also restores the cache if it exists.
@@ -82,6 +80,10 @@ jobs:
           MAILU_VERSION: ${{ env.BRANCH }}
           TRAVIS_BRANCH: ${{ env.BRANCH }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
+      - name: Hack to prevent permissions issue bug of actions/cache
+        run: |
+          sudo mkdir /mailu/filter
+          sudo chmod -R a+rwx /mailu/filter
       #very important step that caches the mailu database files!
       - name: 'Cache clamav DB'
         uses: actions/cache@v2
@@ -112,41 +114,18 @@ jobs:
           MAILU_VERSION: ${{ env.BRANCH }}
           TRAVIS_BRANCH: ${{ env.BRANCH }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
-
-#Uses https://github.com/actions/cache. Using artefacts is not an option due to the 500MB limit.
-#The tar.gz file with all images is ~2GB. So using actions/cache is our only option.
-#actions/cache has a 5GB limit. It uses a FIFO policy. Once 5GB is reached the first stored item
-#is deleted from the cache.
-  deploy:
-    name: deploy
-    needs:
-      - tests
-    runs-on: ubuntu-latest
-    env:
-      DOCKER_ORG: diman0
-    steps: 
-      - uses: actions/checkout@v2
-      - name: Extract branch name
-        shell: bash
-        run: |
-          echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
-      - name: check docker-compose version
-        run: docker-compose -v
       - name: login docker
         env:
           DOCKER_UN: ${{ secrets.Docker_Login }}
           DOCKER_PW: ${{ secrets.Docker_Password }}
-        run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
-      - uses: satackey/action-docker-layer-caching@v0.0.11
-       # Ignore the failure of a step and avoid terminating the job.
-        continue-on-error: true        
+        run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin      
       - name: build all docker images
         run: docker-compose -f tests/build.yml build
         env:
           MAILU_VERSION: ${{ env.BRANCH }}
           TRAVIS_BRANCH: ${{ env.BRANCH }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
-      - name: deploy build docker images
+      - name: deploy built docker images
         env:
           DOCKER_UN: ${{ secrets.Docker_Login }}
           DOCKER_PW: ${{ secrets.Docker_Password }}
@@ -163,8 +142,7 @@ jobs:
     #Returns true when none of the **previous** steps have failed or been canceled.
     if: ${{ success() }}
     needs: 
-      - tests
-      - deploy
+      - build-test-deploy
     runs-on: ubuntu-latest
     steps:
       - name: CI succeeded.
