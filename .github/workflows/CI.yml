@@ -4,12 +4,6 @@ name: CI
 on:
   ## Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-  #trigger on pull request for staging and trying
-#  pull_request:
-#      branches:
-#      - staging
-#      - trying
-  #on push on staging and trying
   push:
     branches:
       - staging
@@ -26,18 +20,23 @@ on:
     # test branches, e.g. test-debian
       - test-*
 
-#All jobs that will run for this workflow.
+###############################################
+# REQUIRED secrets
+# DOCKER_UN: ${{ secrets.Docker_Login }}
+#    Username of docker login for pushing the images to repo $DOCKER_ORG
+# DOCKER_PW: ${{ secrets.Docker_Password }}
+#    Password of docker login for pushing the images to repo $DOCKER_ORG
+# DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
+#    The docker repository where the images are pushed to.
+#
+# Add the above secrets to your github repo to determine where the images will be pushed.
+################################################
+
 jobs:
-#For now all tests do NOt run in parallel. They all run sequentially in one job.
-#In the future we can use docker-save docker-restore and the action cache,
-#to create parallel jobs. Cache (https://github.com/actions/cache) can be used 
-#to share the build images between all jobs :)
-
-
   build-test-deploy:
     name: build and test and deploy
     runs-on: ubuntu-latest
-    #depends on the clamav db file being updated
+
     steps:
       - uses: actions/checkout@v2
       - name: Extract branch name
@@ -80,16 +79,6 @@ jobs:
           MAILU_VERSION: ${{ env.BRANCH }}
           TRAVIS_BRANCH: ${{ env.BRANCH }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
-      - name: Hack to prevent permissions issue bug of actions/cache
-        run: |
-          sudo mkdir -p /mailu/filter
-          sudo chmod -R a+rwx /mailu/filter
-      #very important step that caches the mailu database files!
-      - name: 'Cache clamav DB'
-        uses: actions/cache@v2
-        with:
-          path: /mailu/filter/main.cvd
-          key: clamav-db
       - name: 'test clamvav'
         run: python tests/compose/test.py filters 2
         env:
