@@ -35,7 +35,7 @@ jobs:
 
 
   tests:
-    name: tests
+    name: build and test
     runs-on: ubuntu-latest
     #depends on the clamav db file being updated
     steps:
@@ -68,7 +68,7 @@ jobs:
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
         run: docker-compose -f tests/build.yml build
       - name: save all docker images for reusage
-        run: docker save mailu/admin mailu/clamav mailu/docs mailu/dovecot mailu/fetchmail mailu/nginx mailu/none mailu/postfix mailu/postgresql mailu/radicale mailu/rainloop mailu/roundcube mailu/rspamd mailu/setup mailu/traefik-certdumper mailu/unbound -o images/images.tar.gz 
+        run: docker save $DOCKER_ORG/admin $DOCKER_ORG/clamav $DOCKER_ORG/docs $DOCKER_ORG/dovecot $DOCKER_ORG/fetchmail $DOCKER_ORG/nginx $DOCKER_ORG/none $DOCKER_ORG/postfix $DOCKER_ORG/postgresql $DOCKER_ORG/radicale $DOCKER_ORG/rainloop $DOCKER_ORG/roundcube $DOCKER_ORG/rspamd $DOCKER_ORG/setup $DOCKER_ORG/traefik-certdumper $DOCKER_ORG/unbound -o images/images.tar.gz 
       - name: copy all certs
         run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'      
       - name: test core suite
