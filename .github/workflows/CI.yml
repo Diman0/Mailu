@@ -54,6 +54,8 @@ jobs:
           DOCKER_PW: ${{ secrets.Docker_Password }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
         run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
+      - name: create folder for storing/caching images
+        run: mkdir images     
       - name: Cache docker images
         uses: actions/cache@v2
         with:
