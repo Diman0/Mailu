@@ -13,8 +13,6 @@ on:
   push:
     branches:
       - staging
-      - trying
-      - staging
       - testing
       - '1.5'
       - '1.6'
@@ -34,6 +32,8 @@ jobs:
 #In the future we can use docker-save docker-restore and the action cache,
 #to create parallel jobs. Cache (https://github.com/actions/cache) can be used 
 #to share the build images between all jobs :)
+
+
   tests:
     name: tests
     runs-on: ubuntu-latest
@@ -54,12 +54,19 @@ jobs:
           DOCKER_PW: ${{ secrets.Docker_Password }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
         run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
+      - name: Cache docker images
+        uses: actions/cache@v2
+        with:
+          path: images/images.tar.gz
+          key: docker-images-${{ env.BRANCH }}-${{ github.sha }}-${{ github.run_id }}   
       - name: build all docker images
         env:
           MAILU_VERSION: ${{ env.BRANCH }}
           TRAVIS_BRANCH: ${{ env.BRANCH }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
         run: docker-compose -f tests/build.yml build
+      - name: save all docker images for reusage
+        run: docker save mailu/admin mailu/clamav mailu/docs mailu/dovecot mailu/fetchmail mailu/nginx mailu/none mailu/postfix mailu/postgresql mailu/radicale mailu/rainloop mailu/roundcube mailu/rspamd mailu/setup mailu/traefik-certdumper mailu/unbound -o images/images.tar.gz 
       - name: copy all certs
         run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'      
       - name: test core suite
@@ -78,7 +85,7 @@ jobs:
       - name: 'Cache clamav DB'
         uses: actions/cache@v2
         with:
-          path: /mailu/filter/
+          path: /mailu/filter/main.cvd
           key: clamav-db
       - name: 'test clamvav'
         run: python tests/compose/test.py filters 2
@@ -105,11 +112,10 @@ jobs:
           TRAVIS_BRANCH: ${{ env.BRANCH }}
           DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
 
-#Must be changed in the future. With travis, the deploy script shared the build context.
-#now we rebuild all images what takes time. We must investigate if we can somehow share 
-#the build context between job tests and job deploy. 
-#Perhaps we could make use of caching. The limit is 5GB for the cache
-#https://github.com/actions/cache
+#Uses https://github.com/actions/cache. Using artefacts is not an option due to the 500MB limit.
+#The tar.gz file with all images is ~2GB. So using actions/cache is our only option.
+#actions/cache has a 5GB limit. It uses a FIFO policy. Once 5GB is reached the first stored item
+#is deleted from the cache.
   deploy:
     name: deploy
     needs:
@@ -130,7 +136,19 @@ jobs:
           DOCKER_UN: ${{ secrets.Docker_Login }}
           DOCKER_PW: ${{ secrets.Docker_Password }}
         run: echo "$DOCKER_PW" | docker login --username $DOCKER_UN --password-stdin
+      - name: create folder for storing/caching images
+        run: mkdir images
+      - name: Cache docker images
+        id: cache
+        uses: actions/cache@v2
+        with:
+          path: images/images.tar.gz
+          key: docker-images-${{ env.BRANCH }}-${{ github.sha }}-${{ github.run_id }}
+      - name: Load docker images
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: docker load -i images/images.tar.gz
       - name: build all docker images
+        if: steps.cache.outputs.cache-hit != 'true'
         run: docker-compose -f tests/build.yml build
         env:
           MAILU_VERSION: ${{ env.BRANCH }}
