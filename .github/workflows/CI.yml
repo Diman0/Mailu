@@ -44,7 +44,7 @@ jobs:
           sudo mkdir -p /images
           sudo chmod 777 /images
       - name: Configure docker building layer caching
-      - uses: satackey/action-docker-layer-caching@v0.0.11
+        uses: satackey/action-docker-layer-caching@v0.0.11
         # Ignore the failure of a step and avoid terminating the job.
         continue-on-error: true
       - name: Check docker-compose version
