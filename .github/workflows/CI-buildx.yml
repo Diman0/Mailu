@@ -5,14 +5,14 @@ on:
   # Triggers the workflow on push or pull request events but only for the main branch
   push:
     branches:
-      - 'feat-1200-multiarch-1.9.0'
+      - 'feature/multiarch'
 
 # Global environment variables
 env:
-  DOCKER_ORG: "erriez"
+  DOCKER_ORG: "leolivier"
   DOCKER_PREFIX: "mailu-"
-  PINNED_MAILU_VERSION: "1.9.0"
-  PUSH_IMAGES: ${{ github.repository == 'erriez/mailu' && github.event_name != 'pull_request' }}
+  PINNED_MAILU_VERSION: "1.9-multiarch-latest"
+  PUSH_IMAGES: ${{ github.repository == 'leolivier/Mailu' && github.event_name != 'pull_request' }}
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:    
