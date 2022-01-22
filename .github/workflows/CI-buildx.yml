@@ -17,13 +17,16 @@ env:
   PINNED_MAILU_VERSION: "1.9-multiarch"
 #  PUSH_IMAGES: ${{ github.repository == 'leolivier/Mailu' && github.event_name != 'pull_request' }}
   PUSH_IMAGES: ${{ github.repository == 'leolivier/Mailu' && github.event_name == 'release' }}
-  MAILU_TAG: ${{ github.ref_name }}
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:    
   build:
     runs-on: ubuntu-latest
     steps:
+      # compute tag
+      - name: Compute Tag
+        run: [ "${PUSH_IMAGES}" == "1" ] && echo MAILU_TAG=${GITHUB_REF_NAME} >> $GITHUB_ENV
+
       # Checkout
       - name: Checkout
         uses: actions/checkout@v2
