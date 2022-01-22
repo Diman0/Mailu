@@ -1,0 +1,69 @@
+name: CI-buildx
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on release 
+  # or push to feature/multiarch
+  release:
+    types: [published released]
+  push:
+    branches:
+      - 'feature/multiarch'
+
+# Global environment variables
+env:
+  DOCKER_ORG: "leolivier"
+  DOCKER_PREFIX: "mailu-"
+  PINNED_MAILU_VERSION: "1.9-multiarch"
+#  PUSH_IMAGES: ${{ github.repository == 'leolivier/Mailu' && github.event_name != 'pull_request' }}
+  PUSH_IMAGES: ${{ github.repository == 'leolivier/Mailu' && github.event_name == 'release' }}
+  MAILU_TAG: ${{ github.ref_name }}
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:    
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # compute tag
+      - name: Compute Tag
+        run: echo MAILU_TAG=$(echo ${GITHUB_REF_NAME:local} | iconv -t ascii//TRANSLIT | sed -r s/[^a-zA-Z0-9]+/-/g | sed -r s/^-+\|-+$//g | tr A-Z a-z) >> $GITHUB_ENV
+      - name: Check Tag
+        run: echo "TAG=" ${{env.MAILU_TAG}} " PUSH=" ${{env.PUSH_IMAGES}}
+
+      # Checkout
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      # Create /version file
+      - name: Create version file
+        shell: bash
+        run: |
+          VERSION_FILE="Source: https://github.com/$GITHUB_REPOSITORY Branch: $GITHUB_REF_NAME Tag: $PINNED_MAILU_VERSION Hash: $GITHUB_SHA"
+          echo "VERSION_FILE=$VERSION_FILE"
+          echo "VERSION_FILE=$VERSION_FILE" >> $GITHUB_ENV
+
+      # QEMU setup
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      
+      # Setup buildx
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      # Login Dockerhub
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        if: env.PUSH_IMAGES == 'true'
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Build and optional push
+      - name: Build and optional push
+        uses: docker/bake-action@v1.6.0
+        with:
+          files: tests/build.hcl
+          push: ${{ env.PUSH_IMAGES }}
+          set: |
+            "*.args.VERSION=${{ env.VERSION_FILE }}"
+            "*.args.pinned_version=${{ env.VERSION_FILE }}"
