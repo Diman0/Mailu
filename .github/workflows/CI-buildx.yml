@@ -2,7 +2,10 @@ name: CI-buildx
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the main branch
+  # Triggers the workflow on release 
+  # or push to feature/multiarch
+  release:
+    types: [published released]
   push:
     branches:
       - 'feature/multiarch'
@@ -11,8 +14,10 @@ on:
 env:
   DOCKER_ORG: "leolivier"
   DOCKER_PREFIX: "mailu-"
-  PINNED_MAILU_VERSION: "1.9-multiarch-latest"
-  PUSH_IMAGES: ${{ github.repository == 'leolivier/Mailu' && github.event_name != 'pull_request' }}
+  PINNED_MAILU_VERSION: "1.9-multiarch"
+#  PUSH_IMAGES: ${{ github.repository == 'leolivier/Mailu' && github.event_name != 'pull_request' }}
+  PUSH_IMAGES: ${{ github.repository == format('{{{0}/Mailu', env.DOCKER_ORG) && github.event_name == 'release' }}
+  MAILU_TAG: ${{ github.ref_name }}
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:    
@@ -54,6 +59,7 @@ jobs:
         with:
           files: tests/build.hcl
           push: ${{ env.PUSH_IMAGES }}
+          targets: docs  # for testing
           set: |
             "*.args.VERSION=${{ env.VERSION_FILE }}"
             "*.args.pinned_version=${{ env.VERSION_FILE }}"

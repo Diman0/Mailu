@@ -7,6 +7,9 @@ variable "DOCKER_PREFIX" {
 variable "PINNED_MAILU_VERSION" {
   default = "local"
 }
+variable "MAILU_TAG" {
+  default = "local"
+}
 
 # -----------------------------------------------------------------------------------------
 group "default" {
@@ -39,7 +42,10 @@ target "defaults" {
 # -----------------------------------------------------------------------------------------
 function "tag" {
   params = [image_name]
-  result = "${DOCKER_ORG}/${DOCKER_PREFIX}${image_name}:${PINNED_MAILU_VERSION}"
+  result = [ "${DOCKER_ORG}/${DOCKER_PREFIX}${image_name}:${PINNED_MAILU_VERSION}", 
+             "${DOCKER_ORG}/${DOCKER_PREFIX}${image_name}:${MAILU_TAG}",
+             "${DOCKER_ORG}/${DOCKER_PREFIX}${image_name}:latest" 
+          ]
 }
 
 # -----------------------------------------------------------------------------------------
@@ -48,13 +54,13 @@ function "tag" {
 target "docs" {
   inherits = ["defaults"]
   context = "docs"
-  tags = [ tag("docs") ]
+  tags = tag("docs")
 }
 
 target "setup" {
   inherits = ["defaults"]
   context="setup"
-  tags = [ tag("setup") ]
+  tags = tag("setup")
 }
 
 # -----------------------------------------------------------------------------------------
@@ -63,37 +69,37 @@ target "setup" {
 target "none" {
   inherits = ["defaults"]
   context="core/none"
-  tags = [ tag("none") ]
+  tags = tag("none")
 }
 
 target "admin" {
   inherits = ["defaults"]
   context="core/admin"
-  tags = [ tag("admin") ]
+  tags = tag("admin")
 }
 
 target "antispam" {
   inherits = ["defaults"]
   context="core/rspamd"
-  tags = [ tag("rspamd") ]
+  tags = tag("rspamd")
 }
 
 target "front" {
   inherits = ["defaults"]
   context="core/nginx"
-  tags = [ tag("nginx") ]
+  tags = tag("nginx")
 }
 
 target "imap" {
   inherits = ["defaults"]
   context="core/dovecot"
-  tags = [ tag("dovecot") ]
+  tags = tag("dovecot")
 }
 
 target "smtp" {
   inherits = ["defaults"]
   context="core/postfix"
-  tags = [ tag("postfix") ]
+  tags = tag("postfix")
 }
 
 # -----------------------------------------------------------------------------------------
@@ -102,13 +108,13 @@ target "smtp" {
 target "rainloop" {
   inherits = ["defaults"]
   context="webmails/rainloop"
-  tags = [ tag("rainloop") ]
+  tags = tag("rainloop")
 }
 
 target "roundcube" {
   inherits = ["defaults"]
   context="webmails/roundcube"
-  tags = [ tag("roundcube") ]
+  tags = tag("roundcube")
 }
 
 # -----------------------------------------------------------------------------------------
@@ -117,29 +123,29 @@ target "roundcube" {
 target "antivirus" {
   inherits = ["defaults"]
   context="optional/clamav"
-  tags = [ tag("clamav") ]
+  tags = tag("clamav")
 }
 
 target "fetchmail" {
   inherits = ["defaults"]
   context="optional/fetchmail"
-  tags = [ tag("fetchmail") ]
+  tags = tag("fetchmail")
 }
 
 target "resolver" {
   inherits = ["defaults"]
   context="optional/unbound"
-  tags = [ tag("unbound") ]
+  tags = tag("unbound")
 }
 
 target "traefik-certdumper" {
   inherits = ["defaults"]
   context="optional/traefik-certdumper"
-  tags = [ tag("traefik-certdumper") ]
+  tags = tag("traefik-certdumper")
 }
 
 target "webdav" {
   inherits = ["defaults"]
   context="optional/radicale"
-  tags = [ tag("radicale") ]
+  tags = tag("radicale")
 }
