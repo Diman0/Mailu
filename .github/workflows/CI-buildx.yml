@@ -64,7 +64,6 @@ jobs:
         with:
           files: tests/build.hcl
           push: ${{ env.PUSH_IMAGES }}
-          targets: docs  # for testing
           set: |
             "*.args.VERSION=${{ env.VERSION_FILE }}"
             "*.args.pinned_version=${{ env.VERSION_FILE }}"
