@@ -8,7 +8,7 @@ on:
     types: [published released]
   push:
     branches:
-      - 'feature/multiarch'
+      - 'master'
 
 # Global environment variables
 env:
