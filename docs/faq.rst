@@ -267,6 +267,7 @@ correct syntax. The following file names will be taken as override configuration
 - `Dovecot`_ - ``dovecot.conf`` in dovecot sub-directory;
 - `Nginx`_ - All ``*.conf`` files in the ``nginx`` sub-directory;
 - `Rspamd`_ - All files in the ``rspamd`` sub-directory.
+- Roundcube - All ``*.inc`` files in the ``roundcube`` sub directory.
 
 To override the root location (``/``) in Nginx ``WEBROOT_REDIRECT`` needs to be set to ``none`` in the env file (see :ref:`web settings <web_settings>`).
 
@@ -664,6 +665,8 @@ The above will block flagged IPs for a week, you can of course change it to you 
 The above will block flagged IPs for a week, you can of course change it to you needs.
 
 7. Add the /etc/fail2ban/action.d/docker-action.conf
+  
+Option 1: Use plain iptables
 
 .. code-block:: bash
 
@@ -671,9 +674,9 @@ The above will block flagged IPs for a week, you can of course change it to you 
   
   actionstart = iptables -N f2b-bad-auth
                 iptables -A f2b-bad-auth -j RETURN
-                iptables -I DOCKER-USER -p tcp -m multiport --dports 1:1024 -j f2b-bad-auth
+                iptables -I DOCKER-USER -j f2b-bad-auth
   
-  actionstop = iptables -D DOCKER-USER -p tcp -m multiport --dports 1:1024 -j f2b-bad-auth
+  actionstop = iptables -D DOCKER-USER -j f2b-bad-auth
                iptables -F f2b-bad-auth
                iptables -X f2b-bad-auth
   
@@ -685,7 +688,34 @@ The above will block flagged IPs for a week, you can of course change it to you 
 
 Using DOCKER-USER chain ensures that the blocked IPs are processed in the correct order with Docker. See more in: https://docs.docker.com/network/iptables/
 
-8. Configure and restart the Fail2Ban service
+Option 2:  Use ipset together with iptables
+IMPORTANT: You have to install ipset on the host system, eg. `apt-get install ipset` on a Debian/Ubuntu system.
+
+See ipset homepage for details on ipset, https://ipset.netfilter.org/.
+
+ipset and iptables provide one big advantage over just using iptables: This setup reduces the overall iptable rules.
+There is just one rule for the bad authentications and the IPs are within the ipset. 
+Specially in larger setups with a high amount of brute force attacks this comes in handy.
+Using iptables with ipset might reduce the system load in such attacks significantly.
+
+.. code-block:: bash
+
+  [Definition]
+
+  actionstart = actionstart = ipset --create f2b-bad-auth iphash
+                iptables -I DOCKER-USER -m set --match-set f2b-bad-auth src -j DROP
+
+  actionstop = iptables -D DOCKER-USER -m set --match-set f2b-bad-auth src -j DROP
+               ipset --destroy f2b-bad-auth
+
+
+  actionban = ipset add -exist f2b-bad-auth <ip>
+
+  actionunban = ipset del -exist f2b-bad-auth <ip>
+
+Using DOCKER-USER chain ensures that the blocked IPs are processed in the correct order with Docker. See more in: https://docs.docker.com/network/iptables/
+
+1. Configure and restart the Fail2Ban service
 
 Make sure Fail2Ban is started after the Docker service by adding a partial override which appends this to the existing configuration.
 
