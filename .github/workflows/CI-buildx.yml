@@ -3,9 +3,11 @@ name: CI-buildx
 # Controls when the workflow will run
 on:
   # Triggers the workflow on release 
-  # or push to feature/multiarch
+  # or push to master
   release:
-    types: [published released]
+    types:
+      - published
+      - released
   push:
     branches:
       - 'master'
@@ -15,8 +17,7 @@ env:
   DOCKER_ORG: "leolivier"
   DOCKER_PREFIX: "mailu-"
   PINNED_MAILU_VERSION: "1.9-multiarch"
-#  PUSH_IMAGES: ${{ github.repository == 'leolivier/Mailu' && github.event_name != 'pull_request' }}
-  PUSH_IMAGES: ${{ github.repository == 'leolivier/Mailu' && github.event_name == 'release' }}
+  PUSH_IMAGES: ${{ github.event_name == 'release' }}
   MAILU_TAG: ${{ github.ref_name }}
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:    
@@ -26,8 +27,10 @@ jobs:
       # compute tag
       - name: Compute Tag
         run: echo MAILU_TAG=$(echo ${GITHUB_REF_NAME:local} | iconv -t ascii//TRANSLIT | sed -r s/[^a-zA-Z0-9]+/-/g | sed -r s/^-+\|-+$//g | tr A-Z a-z) >> $GITHUB_ENV
+      - name: Check Trigger
+        run: echo "TRIGGERED BY " $${{ github.event_name }} " ON BRANCH/TAG " ${{ github.ref_name }}
       - name: Check Tag
-        run: echo "TAG=" ${{env.MAILU_TAG}} " PUSH=" ${{env.PUSH_IMAGES}}
+        run: echo "TAG=" ${{env.MAILU_TAG}} " WILL PUSH=" ${{env.PUSH_IMAGES}}
 
       # Checkout
       - name: Checkout
