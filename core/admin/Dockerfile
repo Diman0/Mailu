@@ -1,5 +1,5 @@
 # First stage to build assets
-ARG DISTRO=alpine:3.14.4
+ARG DISTRO=alpine:3.14.5
 
 # Temporary build image
 FROM --platform=$BUILDPLATFORM node:16 as assets
