@@ -6,7 +6,7 @@ on:
   # or push to master
   release:
     types:
-      - published
+#      - published
       - released
   push:
     branches:
@@ -17,7 +17,7 @@ env:
   DOCKER_ORG: "leolivier"
   DOCKER_PREFIX: "mailu-"
   PINNED_MAILU_VERSION: "1.9-multiarch"
- PUSH_IMAGES: ${{ github.event_name == 'release' }}
+  PUSH_IMAGES: ${{ github.event_name == 'release' }}
 ## force push temporarily until push on release is working
 #  PUSH_IMAGES: true 
   MAILU_TAG: ${{ github.ref_name }}
