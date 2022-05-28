@@ -23,7 +23,7 @@ RUN set -eu \
 # Actual application
 FROM $DISTRO
 ARG VERSION
-
+ARG TARGETPLATFORM
 ENV TZ Etc/UTC
 
 LABEL version=$VERSION
@@ -41,6 +41,7 @@ RUN set -eu \
  && apk add --no-cache libressl curl postgresql-libs mariadb-connector-c \
  && apk add --no-cache --virtual build-dep libressl-dev libffi-dev python3-dev build-base postgresql-dev mariadb-connector-c-dev cargo \
  && pip install --upgrade pip \
+ && ([ ${TARGETPLATFORM} == 'linux/arm/v7' ] && echo "[global]" >/etc/pip.conf && echo "extra-index-url=https://www.piwheels.org/simple" >>/etc/pip.conf) || echo "not running on arm/v7" \
  && pip install -r requirements.txt \
  && apk del --no-cache build-dep
 
