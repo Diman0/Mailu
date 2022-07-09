@@ -72,3 +72,5 @@ jobs:
           set: |
             "*.args.VERSION=${{ env.VERSION_FILE }}"
             "*.args.pinned_version=${{ env.VERSION_FILE }}"
+            "*.cache-from=type=gha"
+            "*.cache-to=type=gha,mode=max"
