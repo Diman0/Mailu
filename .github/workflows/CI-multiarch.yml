@@ -72,7 +72,7 @@ jobs:
         if: ${{ github.event_name != 'release' }}
         shell: bash
         run: |
-          echo "DOCKER_ORG=ghcr.io/${{ env.DOCKER_ORG }} >> $GITHUB_ENV
+          echo "DOCKER_ORG=ghcr.io/${{ env.DOCKER_ORG }}" >> $GITHUB_ENV
 
     outputs:
       BRANCH: ${{ env.BRANCH }}
