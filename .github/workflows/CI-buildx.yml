@@ -30,7 +30,7 @@ jobs:
       - name: Compute Tag
         run: echo MAILU_TAG=$(echo ${GITHUB_REF_NAME:local} | iconv -t ascii//TRANSLIT | sed -r s/[^a-zA-Z0-9]+/-/g | sed -r s/^-+\|-+$//g | tr A-Z a-z) >> $GITHUB_ENV
       - name: Check Trigger
-        run: echo "TRIGGERED BY " $${{ github.event_name }} " ON BRANCH/TAG " ${{ github.ref_name }}
+        run: echo "TRIGGERED BY " ${{ github.event_name }} " ON BRANCH/TAG " ${{ github.ref_name }}
       - name: Check Tag
         run: echo "TAG=" ${{env.MAILU_TAG}} " WILL PUSH=" ${{env.PUSH_IMAGES}}
 
