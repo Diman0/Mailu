@@ -68,13 +68,22 @@ jobs:
           GITHUB_SHA: ${{ env.GITHUB_SHA }}
         run: |
           echo "PINNED_MAILU_VERSION=$GITHUB_SHA" >> $GITHUB_ENV
+      - name: setup DOCKER_ORG for non release
+        if: ${{ github.event_name != 'release' }}
+        shell: bash
+        run: |
+          echo "DOCKER_ORG=ghcr.io/${{ env.DOCKER_ORG }} >> $GITHUB_ENV
+        with:
+          registry: ghcr.io
+
     outputs:
       BRANCH: ${{ env.BRANCH }}
       MAILU_VERSION: ${{ env.MAILU_VERSION }}
       PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+      DOCKER_ORG: ${{ env.DOCKER_ORG }} 
 
   build:
-    name: setup environment
+    name: bake mailu
     runs-on: ubuntu-latest
     needs: setup
     steps:
@@ -84,6 +93,7 @@ jobs:
           echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
           echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
           echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
       - uses: actions/checkout@v3
         with:
           # fetch-depth 0 is required to also retrieve all tags.
@@ -141,6 +151,7 @@ jobs:
           echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
           echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
           echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
       - uses: actions/checkout@v3
         with:
           # fetch-depth 0 is required to also retrieve all tags.
