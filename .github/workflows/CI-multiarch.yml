@@ -73,8 +73,6 @@ jobs:
         shell: bash
         run: |
           echo "DOCKER_ORG=ghcr.io/${{ env.DOCKER_ORG }} >> $GITHUB_ENV
-        with:
-          registry: ghcr.io
 
     outputs:
       BRANCH: ${{ env.BRANCH }}
