@@ -150,6 +150,7 @@ jobs:
         uses: docker/bake-action@v2.1.0
         with:
           files: tests/build.hcl
+          targets: ${{ matrix.target }}
           push: 'true'
           set: |
             *.args.VERSION=${{ env.VERSION_FILE }}
