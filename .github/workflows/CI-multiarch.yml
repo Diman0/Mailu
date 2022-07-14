@@ -99,9 +99,9 @@ jobs:
   build:
     name: bake mailu
     runs-on: ubuntu-latest
-    needs: |
-      setup
-      targets
+    needs:
+      - setup
+      - targets
     strategy:
       fail-fast: false
       matrix:
