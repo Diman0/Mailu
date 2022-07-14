@@ -156,7 +156,7 @@ jobs:
             *.args.pinned_version=${{ env.VERSION_FILE }}
             *.cache-from=type=gha,scope=build-${{ matrix.target }}
             *.cache-to=type=gha,scope=build-${{ matrix.target }},mode=max
-            *.platform=linux/amd64"
+            *.platform=linux/amd64
 
   test-core:
     name: Perform core tests
