@@ -134,7 +134,7 @@ jobs:
             "*.args.pinned_version=${{ env.VERSION_FILE }}"
             "*.cache-from=type=gha"
             "*.cache-to=type=gha,mode=max"
-            "*.platform=linux/arm64"
+            "*.platform=linux/amd64"
 
   test-core:
     name: Perform core tests
