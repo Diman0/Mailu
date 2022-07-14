@@ -91,7 +91,7 @@ jobs:
       - name: Create matrix
         id: targets
         run: |
-          echo ::set-output name=matrix::$(docker buildx bake --print | jq -cr '.group.default.targets')
+          echo ::set-output name=matrix::$(docker buildx bake -f ./tests/build.hcl --print | jq -cr '.group.default.targets')
       - name: Show matrix
         run: |
           echo ${{ steps.targets.outputs.matrix }}
