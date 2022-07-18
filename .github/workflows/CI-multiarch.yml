@@ -188,7 +188,7 @@ jobs:
           # fetch-depth 0 is required to also retrieve all tags.
           fetch-depth: 0
       - name: Load docker images
-        run: cd tests/core && docker-compose up -d 
+        run: cd tests/compose/core && docker-compose up -d 
       - name: Install python packages
         run: python3 -m pip install -r tests/requirements.txt
       - name: Copy all certs
