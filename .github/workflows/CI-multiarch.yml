@@ -23,8 +23,10 @@ concurrency: ci-${{ github.ref }}
 ################################################
 # Global environment variables, work value
 env:
-  DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
-  DOCKER_PREFIX: ${{ secrets.DOCKER_PREFIX }}
+# ${{ secrets.DOCKER_ORG }}
+  DOCKER_ORG: "leolivier" 
+# ${{ secrets.DOCKER_PREFIX }}
+  DOCKER_PREFIX: "mailu-"
   HCL_FILE: ./tests/build.hcl
 
 jobs:
