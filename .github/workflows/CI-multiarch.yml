@@ -10,11 +10,6 @@ on:
       - test-*
 
 concurrency: ci-${{ github.ref }}
-# Global environment variables, work value, todo: move to secrets
-env:
-  DOCKER_ORG: "leolivier"
-  DOCKER_PREFIX: "mailu-"
-
 
 ###############################################
 # REQUIRED secrets
@@ -23,7 +18,14 @@ env:
 # DOCKER_PW: ${{ secrets.Docker_Password }}
 #    Password of docker login for pushing the images to repo $DOCKER_ORG
 # Test images will be stored in GHCR.io. Only used for the branch TESTING (BORS try).
+# DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
+# DOCKER_PREFIX: ${{ secrets.DOCKER_PREFIX }}
 ################################################
+# Global environment variables, work value
+env:
+  DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
+  DOCKER_PREFIX: ${{ secrets.DOCKER_PREFIX }}
+  HCL_FILE: ./tests/build.hcl
 
 jobs:
   setup:
@@ -74,12 +76,19 @@ jobs:
         shell: bash
         run: |
           echo "DOCKER_ORG=ghcr.io/${{ env.DOCKER_ORG }}" >> $GITHUB_ENV
+      - name: Create version file
+        shell: bash
+        run: |
+          VERSION_FILE="Source: https://github.com/$GITHUB_REPOSITORY Branch: $GITHUB_REF_NAME Tag: $PINNED_MAILU_VERSION Hash: $GITHUB_SHA"
+          echo "VERSION_FILE=$VERSION_FILE"
+          echo "VERSION_FILE=$VERSION_FILE" >> $GITHUB_ENV
 
     outputs:
       BRANCH: ${{ env.BRANCH }}
       MAILU_VERSION: ${{ env.MAILU_VERSION }}
       PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
-      DOCKER_ORG: ${{ env.DOCKER_ORG }} 
+      DOCKER_ORG: ${{ env.DOCKER_ORG }}
+      VERSION_FILE: ${{ env.VERSION_FILE }}
 
   targets:
     name: create targets
@@ -92,7 +101,7 @@ jobs:
       - name: Create matrix
         id: targets
         run: |
-          echo ::set-output name=matrix::$(docker buildx bake -f ./tests/build.hcl --print | jq -cr '.group.default.targets')
+          echo ::set-output name=matrix::$(docker buildx bake -f ${{env.HCL_FILE}} --print | jq -cr '.group.default.targets')
       - name: Show matrix
         run: |
           echo ${{ steps.targets.outputs.matrix }}
@@ -115,6 +124,7 @@ jobs:
           echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
           echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
           echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+          echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
       - uses: actions/checkout@v3
         with:
           # fetch-depth 0 is required to also retrieve all tags.
@@ -136,12 +146,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create version file
-        shell: bash
-        run: |
-          VERSION_FILE="Source: https://github.com/$GITHUB_REPOSITORY Branch: $GITHUB_REF_NAME Tag: $PINNED_MAILU_VERSION Hash: $GITHUB_SHA"
-          echo "VERSION_FILE=$VERSION_FILE"
-          echo "VERSION_FILE=$VERSION_FILE" >> $GITHUB_ENV
 
       # needed for gha cache?
       - uses: crazy-max/ghaction-github-runtime@v2
@@ -150,9 +154,11 @@ jobs:
       - name: Build and push
         uses: docker/bake-action@v2.1.0
         with:
-          files: tests/build.hcl
+          files: $${env.HCL_FILE}}
           targets: ${{ matrix.target }}
-          push: 'true'
+#          push: 'true'
+          load: 'true'
+          push: 'false' 
           set: |
             *.args.VERSION=${{ env.VERSION_FILE }}
             *.args.pinned_version=${{ env.VERSION_FILE }}
@@ -174,12 +180,13 @@ jobs:
           echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
           echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
           echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+          echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
       - uses: actions/checkout@v3
         with:
           # fetch-depth 0 is required to also retrieve all tags.
           fetch-depth: 0
       - name: Load docker images
-        run: docker-compose up -d 
+        run: cd tests/core && docker-compose up -d 
       - name: Install python packages
         run: python3 -m pip install -r tests/requirements.txt
       - name: Copy all certs
@@ -678,7 +685,8 @@ jobs:
     #Returns true when none of the **previous** steps have failed or have been canceled.
     if: ${{ success() }}
     needs:
-      - deploy
+#      - deploy
+      - test-core
     runs-on: ubuntu-latest
     steps:
       - name: CI/CD succeeded.
