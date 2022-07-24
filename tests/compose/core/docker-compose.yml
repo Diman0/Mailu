@@ -15,6 +15,8 @@ services:
 
   # Core services
   front:
+ #   build:
+ #     context: .
     image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}nginx:${PINNED_MAILU_VERSION:-local}
     restart: always
     env_file: mailu.env
@@ -34,8 +36,8 @@ services:
       - "/mailu/certs:/certs"
 
   admin:
-    build:
-      context: .
+ #   build:
+ #     context: .
     image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}admin:${PINNED_MAILU_VERSION:-local}
     restart: always
     env_file: mailu.env
@@ -49,8 +51,8 @@ services:
       - resolver
 
   imap:
-    build:
-      context: .
+#    build:
+#      context: .
     image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}dovecot:${PINNED_MAILU_VERSION:-local}
     restart: always
     env_file: mailu.env
@@ -72,8 +74,8 @@ services:
       - front
 
   antispam:
-    build:
-      context: .
+#    build:
+#      context: .
     image: ${DOCKER_ORG:-mailu}/${DOCKER_PREFIX:-}rspamd:${PINNED_MAILU_VERSION:-local}
     restart: always
     env_file: mailu.env
