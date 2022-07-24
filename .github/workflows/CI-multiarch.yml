@@ -36,45 +36,35 @@ jobs:
     name: setup environment
     runs-on: ubuntu-latest
     steps:
-      - name: Extract branch name
+      - name: setup script
         shell: bash
+        # Extract branch name. For branch TESTING, we set the image tag to PR-xxxx else to BRANCH.
+        # Then compute PINNED_MAILU_VERSION dependning on BRANCH type
         run: |
-          echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
-        #For branch TESTING, we set the image tag to PR-xxxx
-      - name: Derive MAILU_VERSION and PINNED_MAILU_VERSION for branch testing
-        if: ${{ env.BRANCH == 'testing' }}
-        shell: bash
-        env:
-          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-        run: |
-          echo "MAILU_VERSION=pr-${COMMIT_MESSAGE//[!0-9]/}" >> $GITHUB_ENV
-          echo "PINNED_MAILU_VERSION=pr-${COMMIT_MESSAGE//[!0-9]/}" >> $GITHUB_ENV
-      - name: Derive MAILU_VERSION for other branches than testing
-        if: ${{ env.BRANCH != 'testing' }}
-        shell: bash
-        run: |
-          echo "MAILU_VERSION=${{ env.BRANCH }}" >> $GITHUB_ENV
-      - name: Derive PINNED_MAILU_VERSION for normal release x.y
-        if: ${{ env.BRANCH != 'testing' && env.BRANCH != 'staging' && env.BRANCH != 'master' }}
-        shell: bash
-        run: |
-          version=$( git tag --sort=version:refname --list "${{ env.MAILU_VERSION }}.*" | tail -1  );
-          root_version=${version%.*};
-          patch_version=${version##*.};
-          if [ "$patch_version" == "" ]; then pinned_version=${{ env.MAILU_VERSION }}.0; else pinned_version=$root_version.$(expr $patch_version + 1); fi;
-          echo "PINNED_MAILU_VERSION=$pinned_version" >> $GITHUB_ENV
-      - name: Derive PINNED_MAILU_VERSION for staging
-        if: ${{ env.BRANCH == 'staging' }}
-        shell: bash
-        run: |
-          echo "PINNED_MAILU_VERSION=staging" >> $GITHUB_ENV      
-      - name: Derive PINNED_MAILU_VERSION for master
-        if: ${{ env.BRANCH == 'master' }}
-        shell: bash
-        env:
-          GITHUB_SHA: ${{ env.GITHUB_SHA }}
-        run: |
-          echo "PINNED_MAILU_VERSION=$GITHUB_SHA" >> $GITHUB_ENV
+          BRANCH="${GITHUB_REF#refs/heads/}";
+          if [ "$BRANCH" == 'testing' ]; then
+              COMMIT_MESSAGE="${{ github.event.head_commit.message }}";
+              MAILU_VERSION="pr-${COMMIT_MESSAGE//[!0-9]/}"; 
+          else MAILU_VERSION=$BRANCH;
+          fi;
+          case $BRANCH in:
+            'testing') PINNED_MAILU_VERSION="$MAILU_VERSION";;
+            'staging') PINNED_MAILU_VERSION=staging;;
+            'master' | 'ci-multiarch') PINNED_MAILU_VERSION="${{ env.GITHUB_SHA }}";;
+            *)
+              version=$( git tag --sort=version:refname --list "$MAILU_VERSION.*" | tail -1  );
+              root_version=${version%.*};
+              patch_version=${version##*.};
+              if [ "$patch_version" == "" ]; then 
+                PINNED_MAILU_VERSION=$MAILU_VERSION.0; 
+              else
+                PINNED_MAILU_VERSION=$root_version.$(expr $patch_version + 1);
+              fi;
+              ;;
+            esac;
+            echo "MAILU_VERSION=$MAILU_VERSION" >> $GITHUB_ENV
+            echo "PINNED_MAILU_VERSION=$PINNED_MAILU_VERSION" >> $GITHUB_ENV
+            echo "BRANCH=$BRANCH" >> $GITHUB_ENV
       - name: setup DOCKER_ORG for non release
         if: ${{ github.event_name != 'release' }}
         shell: bash
@@ -86,7 +76,6 @@ jobs:
           VERSION_FILE="Source: https://github.com/$GITHUB_REPOSITORY Branch: $GITHUB_REF_NAME Tag: $PINNED_MAILU_VERSION Hash: $GITHUB_SHA"
           echo "VERSION_FILE=$VERSION_FILE"
           echo "VERSION_FILE=$VERSION_FILE" >> $GITHUB_ENV
-
     outputs:
       BRANCH: ${{ env.BRANCH }}
       MAILU_VERSION: ${{ env.MAILU_VERSION }}
