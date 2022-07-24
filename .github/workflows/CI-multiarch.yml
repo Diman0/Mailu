@@ -50,7 +50,7 @@ jobs:
           case $BRANCH in
             'testing') PINNED_MAILU_VERSION="$MAILU_VERSION";;
             'staging') PINNED_MAILU_VERSION=staging;;
-            'master' | 'ci-multiarch') PINNED_MAILU_VERSION="${{ env.GITHUB_SHA }}";;
+            'master' | 'ci-multiarch') PINNED_MAILU_VERSION="${GITHUB_SHA}";;
             *)
               version=$( git tag --sort=version:refname --list "$MAILU_VERSION.*" | tail -1  );
               root_version=${version%.*};
