@@ -158,12 +158,18 @@ jobs:
             *.cache-to=type=gha,scope=build-${{ matrix.target }},mode=max
             *.platform=linux/amd64
 
-  test-core:
+
+
+  test-generic:
     name: Perform core tests
     runs-on: ubuntu-latest
     needs:
       - setup
       - build
+    strategy:
+      fail-fast: false
+      matrix:
+        test: ['core', 'filters', 'fetchmail', 'rainloop', 'roundcube', 'webdav']
     steps:
       - name: recover setup environment
         shell: bash
@@ -178,189 +184,222 @@ jobs:
           # fetch-depth 0 is required to also retrieve all tags.
           fetch-depth: 0
       - name: Load docker images
-        run: cd tests/compose/core && docker-compose up -d 
+        run: cd tests/compose/${{matrix.test}} && docker-compose up -d 
       - name: Install python packages
         run: python3 -m pip install -r tests/requirements.txt
       - name: Copy all certs
         run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
       - name: Test core suite
-        run: python tests/compose/test.py core 2
+        run: python tests/compose/test.py ${{matrix.test}} 2
         env:
           MAILU_VERSION: ${{ env.MAILU_VERSION }}
           PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
           DOCKER_ORG: ${{ env.DOCKER_ORG }}
 
-  test-fetchmail:
-    name: Perform fetchmail tests
-    runs-on: ubuntu-latest
-    needs:
-      - setup
-      - build
-    steps:
-      - name: recover setup environment
-        shell: bash
-        run: |
-          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
-          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
-          echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
-      - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Load docker images
-        run: cd tests/compose/fetchmail && docker-compose up -d 
-      - name: Install python packages
-        run: python3 -m pip install -r tests/requirements.txt
-      - name: Copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test fetch
-        run: python tests/compose/test.py fetchmail 2
-        env:
-          MAILU_VERSION: ${{ env.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ env.DOCKER_ORG }}
+  # test-core:
+  #   name: Perform core tests
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - setup
+  #     - build
+  #   steps:
+  #     - name: recover setup environment
+  #       shell: bash
+  #       run: |
+  #         echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
+  #         echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+  #         echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         # fetch-depth 0 is required to also retrieve all tags.
+  #         fetch-depth: 0
+  #     - name: Load docker images
+  #       run: cd tests/compose/core && docker-compose up -d 
+  #     - name: Install python packages
+  #       run: python3 -m pip install -r tests/requirements.txt
+  #     - name: Copy all certs
+  #       run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
+  #     - name: Test core suite
+  #       run: python tests/compose/test.py core 2
+  #       env:
+  #         MAILU_VERSION: ${{ env.MAILU_VERSION }}
+  #         PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+  #         DOCKER_ORG: ${{ env.DOCKER_ORG }}
 
-  test-filters:
-    name: Perform filter tests
-    runs-on: ubuntu-latest
-    needs:
-      - setup
-      - build
-    steps:
-      - name: recover setup environment
-        shell: bash
-        run: |
-          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
-          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
-          echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
-      - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Load docker images
-        run: cd tests/compose/fetchmail && docker-compose up -d 
-      - name: Install python packages
-        run: python3 -m pip install -r tests/requirements.txt
-      - name: Copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test clamav
-        run: python tests/compose/test.py filters 3
-        env:
-          MAILU_VERSION: ${{ env.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ env.DOCKER_ORG }}
+  # test-fetchmail:
+  #   name: Perform fetchmail tests
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - setup
+  #     - build
+  #   steps:
+  #     - name: recover setup environment
+  #       shell: bash
+  #       run: |
+  #         echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
+  #         echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+  #         echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         # fetch-depth 0 is required to also retrieve all tags.
+  #         fetch-depth: 0
+  #     - name: Load docker images
+  #       run: cd tests/compose/fetchmail && docker-compose up -d 
+  #     - name: Install python packages
+  #       run: python3 -m pip install -r tests/requirements.txt
+  #     - name: Copy all certs
+  #       run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
+  #     - name: Test fetch
+  #       run: python tests/compose/test.py fetchmail 2
+  #       env:
+  #         MAILU_VERSION: ${{ env.MAILU_VERSION }}
+  #         PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+  #         DOCKER_ORG: ${{ env.DOCKER_ORG }}
 
-  test-rainloop:
-    name: Perform rainloop tests
-    runs-on: ubuntu-latest
-    needs:
-      - setup
-      - build
-    steps:
-      - name: recover setup environment
-        shell: bash
-        run: |
-          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
-          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
-          echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
-      - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Load docker images
-        run: cd tests/compose/fetchmail && docker-compose up -d 
-      - name: Install python packages
-        run: python3 -m pip install -r tests/requirements.txt
-      - name: Copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test rainloop
-        run: python tests/compose/test.py rainloop 2
-        env:
-          MAILU_VERSION: ${{ env.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ env.DOCKER_ORG }}
+  # test-filters:
+  #   name: Perform filter tests
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - setup
+  #     - build
+  #   steps:
+  #     - name: recover setup environment
+  #       shell: bash
+  #       run: |
+  #         echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
+  #         echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+  #         echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         # fetch-depth 0 is required to also retrieve all tags.
+  #         fetch-depth: 0
+  #     - name: Load docker images
+  #       run: cd tests/compose/filters && docker-compose up -d 
+  #     - name: Install python packages
+  #       run: python3 -m pip install -r tests/requirements.txt
+  #     - name: Copy all certs
+  #       run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
+  #     - name: Test clamav
+  #       run: python tests/compose/test.py filters 3
+  #       env:
+  #         MAILU_VERSION: ${{ env.MAILU_VERSION }}
+  #         PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+  #         DOCKER_ORG: ${{ env.DOCKER_ORG }}
 
-  test-roundcube:
-    name: Perform roundcube tests
-    runs-on: ubuntu-latest
-    needs:
-      - setup
-      - build
-    steps:
-      - name: recover setup environment
-        shell: bash
-        run: |
-          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
-          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
-          echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
-      - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Load docker images
-        run: cd tests/compose/fetchmail && docker-compose up -d 
-      - name: Install python packages
-        run: python3 -m pip install -r tests/requirements.txt
-      - name: Copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test roundcube
-        run: python tests/compose/test.py roundcube 2
-        env:
-          MAILU_VERSION: ${{ env.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ env.DOCKER_ORG }}
+  # test-rainloop:
+  #   name: Perform rainloop tests
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - setup
+  #     - build
+  #   steps:
+  #     - name: recover setup environment
+  #       shell: bash
+  #       run: |
+  #         echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
+  #         echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+  #         echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         # fetch-depth 0 is required to also retrieve all tags.
+  #         fetch-depth: 0
+  #     - name: Load docker images
+  #       run: cd tests/compose/rainloop && docker-compose up -d 
+  #     - name: Install python packages
+  #       run: python3 -m pip install -r tests/requirements.txt
+  #     - name: Copy all certs
+  #       run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
+  #     - name: Test rainloop
+  #       run: python tests/compose/test.py rainloop 2
+  #       env:
+  #         MAILU_VERSION: ${{ env.MAILU_VERSION }}
+  #         PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+  #         DOCKER_ORG: ${{ env.DOCKER_ORG }}
 
-  test-webdav:
-    name: Perform webdav tests
-    runs-on: ubuntu-latest
-    needs:
-      - setup
-      - build
-    steps:
-      - name: recover setup environment
-        shell: bash
-        run: |
-          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
-          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
-          echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
-      - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Load docker images
-        run: cd tests/compose/fetchmail && docker-compose up -d 
-      - name: Install python packages
-        run: python3 -m pip install -r tests/requirements.txt
-      - name: Copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test webdav
-        run: python tests/compose/test.py webdav 2
-        env:
-          MAILU_VERSION: ${{ env.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ env.DOCKER_ORG }}
+  # test-roundcube:
+  #   name: Perform roundcube tests
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - setup
+  #     - build
+  #   steps:
+  #     - name: recover setup environment
+  #       shell: bash
+  #       run: |
+  #         echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
+  #         echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+  #         echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         # fetch-depth 0 is required to also retrieve all tags.
+  #         fetch-depth: 0
+  #     - name: Load docker images
+  #       run: cd tests/compose/roundcube && docker-compose up -d 
+  #     - name: Install python packages
+  #       run: python3 -m pip install -r tests/requirements.txt
+  #     - name: Copy all certs
+  #       run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
+  #     - name: Test roundcube
+  #       run: python tests/compose/test.py roundcube 2
+  #       env:
+  #         MAILU_VERSION: ${{ env.MAILU_VERSION }}
+  #         PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+  #         DOCKER_ORG: ${{ env.DOCKER_ORG }}
+
+  # test-webdav:
+  #   name: Perform webdav tests
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - setup
+  #     - build
+  #   steps:
+  #     - name: recover setup environment
+  #       shell: bash
+  #       run: |
+  #         echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
+  #         echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+  #         echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+  #         echo "VERSION_FILE=${{needs.setup.outputs.VERSION_FILE}}" >> $GITHUB_ENV
+  #     - uses: actions/checkout@v3
+  #       with:
+  #         # fetch-depth 0 is required to also retrieve all tags.
+  #         fetch-depth: 0
+  #     - name: Load docker images
+  #       run: cd tests/compose/webdav && docker-compose up -d 
+  #     - name: Install python packages
+  #       run: python3 -m pip install -r tests/requirements.txt
+  #     - name: Copy all certs
+  #       run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
+  #     - name: Test webdav
+  #       run: python tests/compose/test.py webdav 2
+  #       env:
+  #         MAILU_VERSION: ${{ env.MAILU_VERSION }}
+  #         PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+  #         DOCKER_ORG: ${{ env.DOCKER_ORG }}
 
   deploy:
     name: Deploy images
     runs-on: ubuntu-latest
     needs:
       - build
-      - test-core
-      - test-fetchmail
-      - test-filters
-      - test-rainloop
-      - test-roundcube
-      - test-webdav
+      - test-generic
+    #  - test-core
+    #  - test-fetchmail
+    #  - test-filters
+      # - test-rainloop
+      # - test-roundcube
+      # - test-webdav
     steps:
       - name: recover setup environment
         shell: bash
