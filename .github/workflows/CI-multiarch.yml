@@ -201,13 +201,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build
-      - test-generic
-    #  - test-core
-    #  - test-fetchmail
-    #  - test-filters
-      # - test-rainloop
-      # - test-roundcube
-      # - test-webdav
+      - test
     steps:
       - name: recover setup environment
         shell: bash
