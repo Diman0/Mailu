@@ -149,7 +149,7 @@ jobs:
           files: ${{env.HCL_FILE}}
           targets: ${{ matrix.target }}
           push: 'true'
-          load: 'true'
+#          load: 'true'
 #          push: 'false' 
           set: |
             *.args.VERSION=${{ env.VERSION_FILE }}
