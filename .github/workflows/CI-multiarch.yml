@@ -397,6 +397,7 @@ jobs:
   tag-release:
     runs-on: ubuntu-latest
     needs:
+      - setup
       - deploy
     steps:
       - name: recover setup environment
@@ -425,6 +426,36 @@ jobs:
           bodyFile: "RELEASE_TEMPLATE.md"
           tag: ${{ env.PINNED_MAILU_VERSION }}
           token: ${{ secrets.GITHUB_TOKEN }}
+
+# remove temporary ghcr image
+  purge-image:
+    name: Delete image from ghcr.io
+    # don't try to run for now, needs rework on triggerring
+    if: 'false'
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+      - targets
+      - deploy
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.targets.outputs.matrix) }}
+    steps:
+      - name: recover setup environment
+        shell: bash
+        run: |
+          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+      - name: Delete image
+        uses: bots-house/ghcr-delete-image-action@v1
+        with:
+          # NOTE: at now only orgs is supported
+          owner: ${{env.DOCKER_ORG}}
+          name: ${{ matrix.target }}
+          # NOTE: using Personal Access Token
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{env.PINNED_MAILU_VERSION}}
 
  # This job is watched by bors. It only complets if building,testing and deploy worked.
   ci-success:
