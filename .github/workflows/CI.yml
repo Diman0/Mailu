@@ -37,8 +37,8 @@ concurrency: ci-${{ github.ref }}
 # DOCKER_ORG, docker org used for pushing release images (branch x.y and master)
 # DOCKER_ORG_TEST, docker org used for pushing images for testing (branch testing).
 env:
-  DOCKER_ORG: diman
-  DOCKER_ORG_TEST: diman
+  DOCKER_ORG: mailu
+  DOCKER_ORG_TEST: mailuci
   HCL_FILE: ./tests/build.hcl
 
 jobs:
@@ -133,10 +133,10 @@ jobs:
       - name: Retrieve global variables
         shell: bash
         run: |
-          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
-          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+          echo "BRANCH=${{needs.derive-variables.outputs.BRANCH}}" >> $GITHUB_ENV
+          echo "MAILU_VERSION=${{needs.derive-variables.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "PINNED_MAILU_VERSION=${{needs.derive-variables.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.derive-variables.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
       - uses: crazy-max/ghaction-github-runtime@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -182,15 +182,18 @@ jobs:
         include:
           - target: "filters"
             time: "3"
+        exclude:
+          - target: "filters"
+            time: "2"
     steps:
       - uses: actions/checkout@v3
       - name: Retrieve global variables
         shell: bash
         run: |
-          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
-          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+          echo "BRANCH=${{needs.derive-variables.outputs.BRANCH}}" >> $GITHUB_ENV
+          echo "MAILU_VERSION=${{needs.derive-variables.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "PINNED_MAILU_VERSION=${{needs.derive-variables.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.derive-variables.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
       - name: setup buildx instance
         run: docker buildx create --use
       - uses: crazy-max/ghaction-github-runtime@v2
@@ -247,10 +250,10 @@ jobs:
       - name: Retrieve global variables
         shell: bash
         run: |
-          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
-          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+          echo "BRANCH=${{needs.derive-variables.outputs.BRANCH}}" >> $GITHUB_ENV
+          echo "MAILU_VERSION=${{needs.derive-variables.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "PINNED_MAILU_VERSION=${{needs.derive-variables.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.derive-variables.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       - name: Login to Docker Hub
@@ -302,10 +305,10 @@ jobs:
       - name: Retrieve global variables
         shell: bash
         run: |
-          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
-          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+          echo "BRANCH=${{needs.derive-variables.outputs.BRANCH}}" >> $GITHUB_ENV
+          echo "MAILU_VERSION=${{needs.derive-variables.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "PINNED_MAILU_VERSION=${{needs.derive-variables.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.derive-variables.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
       - name: Create tag for branch x.y.
         shell: bash
         run: |
