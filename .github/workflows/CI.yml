@@ -18,10 +18,6 @@ concurrency: ci-${{ github.ref }}
 #    Username of docker login for pushing the images to repo $DOCKER_ORG and $DOCKER_ORG_TESTS
 # DOCKER_PW: ${{ secrets.Docker_Password }}
 #    Password of docker login for pushing the images to repo $DOCKER_ORG and $DOCKER_ORG_TESTS
-# DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
-#    The docker repository where the images are pushed to.
-# DOCKER_ORG_TESTS: ${{ secrets.DOCKER_ORG_TESTS }}
-#    The docker repository for test images. Only used for the branch TESTING (BORS try).
 # Add the above secrets to your github repo to determine where the images will be pushed.
 ################################################
 # Code block that is used as one liner.
@@ -36,11 +32,26 @@ concurrency: ci-${{ github.ref }}
 #  pinned_version=$root_version.$(expr $patch_version + 1)
 #fi
 #echo "PINNED_MAILU_VERSION=$pinned_version" >> $GITHUB_ENV
+################################################
+# REQUIRED global variables
+# DOCKER_ORG, docker org used for pushing release images (branch x.y and master)
+# DOCKER_ORG_TEST, docker org used for pushing images for testing (branch testing).
+env:
+  DOCKER_ORG: diman
+  DOCKER_ORG_TEST: diman
+  HCL_FILE: ./tests/build.hcl
 
 jobs:
-  derive-variables
+# This job calculates all global job variables that are required by all the subsequent jobs.
+# All subsequent jobs will retrieve and use these variables. This way the variables only have to be derived once.
+  derive-variables:
     name: derive variables
     runs-on: ubuntu-latest
+    outputs:
+        MAILU_VERSION: ${{ env.MAILU_VERSION }}
+        PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+        DOCKER_ORG: ${{ env.DOCKER_ORG_DERIVED }}
+        BRANCH: ${{ env.BRANCH }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -52,65 +63,81 @@ jobs:
           echo "BRANCH=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
         #For branch TESTING, we set the image tag to PR-xxxx
       - name: Derive MAILU_VERSION and PINNED_MAILU_VERSION for branch testing
-        if: ${{ env.BRANCH == 'testing' }}
+        if: env.BRANCH == 'testing'
         shell: bash
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
-          DOCKER_ORG_TESTS: ${{ secrets.DOCKER_ORG_TESTS }}
         run: |
           echo "MAILU_VERSION=pr-${COMMIT_MESSAGE//[!0-9]/}" >> $GITHUB_ENV
           echo "PINNED_MAILU_VERSION=pr-${COMMIT_MESSAGE//[!0-9]/}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=$DOCKER_ORG_TESTS" >> $GITHUB_ENV
+          echo "DOCKER_ORG_DERIVED=${{ env.DOCKER_ORG_TEST }}" >> $GITHUB_ENV
       - name: Derive MAILU_VERSION for other branches than testing
-        if: ${{ env.BRANCH != 'testing' }}
+        if: env.BRANCH != 'testing'
         shell: bash
-        env:
-          DOCKER_ORG: ${{ secrets.DOCKER_ORG }}
         run: |
           echo "MAILU_VERSION=${{ env.BRANCH }}" >> $GITHUB_ENV
-          echo "DOCKER_ORG=$DOCKER_ORG" >> $GITHUB_ENV
+          echo "DOCKER_ORG_DERIVED=${{ env.DOCKER_ORG }}" >> $GITHUB_ENV
       - name: Derive PINNED_MAILU_VERSION for normal release x.y
-        if: ${{ env.BRANCH != 'testing' && env.BRANCH != 'staging' && env.BRANCH != 'master' }}
+        if: env.BRANCH != 'testing' && env.BRANCH != 'staging' && env.BRANCH != 'master'
         shell: bash
         run: |
           version=$( git tag --sort=version:refname --list "${{ env.MAILU_VERSION }}.*" | tail -1  );root_version=${version%.*};patch_version=${version##*.};if [ "$patch_version" == "" ]; then pinned_version=${{ env.MAILU_VERSION }}.0; else pinned_version=$root_version.$(expr $patch_version + 1); fi;echo "PINNED_MAILU_VERSION=$pinned_version" >> $GITHUB_ENV
       - name: Derive PINNED_MAILU_VERSION for staging
-        if: ${{ env.BRANCH == 'staging' }}
+        if: env.BRANCH == 'staging'
         shell: bash
         run: |
           echo "PINNED_MAILU_VERSION=staging" >> $GITHUB_ENV
       - name: Derive PINNED_MAILU_VERSION for master
-        if: ${{ env.BRANCH == 'master' }}
+        if: env.BRANCH == 'master'
         shell: bash
         env:
           GITHUB_SHA: ${{ env.GITHUB_SHA }}
         run: |
           echo "PINNED_MAILU_VERSION=$GITHUB_SHA" >> $GITHUB_ENV
-      outputs:
-          MAILU_VERSION: ${{ env.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ env.DOCKER_ORG }}
-          BRANCH: ${{ env.BRANCH }}
 
+# This job calculates what images must be build. It reads the build.hcl file and then outputs all targets (images) in it.
+# This is used by the next build job.
+  targets:
+    name: create targets
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Create matrix
+        id: targets
+        run: |
+          echo ::set-output name=matrix::$(docker buildx bake -f ${{env.HCL_FILE}} --print | jq -cr '.group.default.targets')
+      - name: Show matrix
+        run: |
+          echo ${{ steps.targets.outputs.matrix }}
+
+# This job builds all the images. The build cache is stored in the github actions cache.
+# In further jobs, this cache is used to quickly rebuild the images.
   build:
     name: Build images
     needs:
       - derive-variables
+      - targets
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.targets.outputs.matrix) }}
     runs-on: ubuntu-latest
+    permissions:
+     contents: read
+     packages: write
     steps:
       - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Create folder for storing images
+      - name: Retrieve global variables
+        shell: bash
         run: |
-          sudo mkdir -p /images
-          sudo chmod 777 /images
-      - name: Configure images folder for caching
-        uses: actions/cache@v2
-        with:
-          path: /images
-          key: ${{ needs.derive-variables.outputs.BRANCH }}-${{ github.run_id }}-${{ github.run_number }}
+          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
+          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+      - uses: crazy-max/ghaction-github-runtime@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       - name: Login to Docker Hub
@@ -118,246 +145,112 @@ jobs:
         with:
           username: ${{ secrets.Docker_Login }}
           password: ${{ secrets.Docker_Password }}
+      - name: setup builder instance
+        run: docker buildx create --use
       - name: Build all docker images
-        uses: docker/bake-action@2.1.0
+        env:
+          DOCKER_ORG: ${{ env.DOCKER_ORG }}
+          MAILU_VERSION: ${{ env.MAILU_VERSION }}
+          PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+        uses: docker/bake-action@v2
         with:
-          files: tests/build.hcl
+          files: ${{env.HCL_FILE}}
+          targets: ${{ matrix.target }}
+          load: false
           push: false
           set: |
-            *.args.MAILU_VERSION=${{ needs.derive-variables.outputs.MAILU_VERSION }}
-            *.args.PINNED_MAILU_VERSION=${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
-            *.args.DOCKER_ORG=${{ needs.derive-variables.outputs.DOCKER_ORG }}
-      - name: Save all docker images
-        run: docker save ${{ needs.derive-variables.outputs.DOCKER_ORG }}/admin ${{ needs.derive-variables.outputs.DOCKER_ORG }}/clamav ${{ needs.derive-variables.outputs.DOCKER_ORG }}/docs ${{ needs.derive-variables.outputs.DOCKER_ORG }}/dovecot ${{ needs.derive-variables.outputs.DOCKER_ORG }}/fetchmail ${{ needs.derive-variables.outputs.DOCKER_ORG }}/nginx ${{ needs.derive-variables.outputs.DOCKER_ORG }}/none ${{ needs.derive-variables.outputs.DOCKER_ORG }}/postfix ${{ needs.derive-variables.outputs.DOCKER_ORG }}/radicale ${{ needs.derive-variables.outputs.DOCKER_ORG }}/rainloop ${{ needs.derive-variables.outputs.DOCKER_ORG }}/roundcube ${{ needs.derive-variables.outputs.DOCKER_ORG }}/rspamd ${{ needs.derive-variables.outputs.DOCKER_ORG }}/setup ${{ needs.derive-variables.outputs.DOCKER_ORG }}/traefik-certdumper ${{ needs.derive-variables.outputs.DOCKER_ORG }}/unbound -o /images/images.tar.gz
+            *.cache-from=type=gha,scope=build-${{ matrix.target }}
+            *.cache-to=type=gha,scope=build-${{ matrix.target }},mode=max
+            *.platform=linux/amd64
 
-  test-core:
-    name: Perform core tests
+# This job runs all the tests.
+  tests:
+    name: tests
     runs-on: ubuntu-latest
+    permissions:
+     contents: read
+     packages: read
     needs:
-      - build
       - derive-variables
+      - targets
+      - build
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ["core", "fetchmail", "filters", "rainloop", "roundcube", "webdav"]
+        time: ["2"]
+        include:
+          - target: "filters"
+            time: "3"
     steps:
       - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-       - name: Create folder for storing images
+      - name: Retrieve global variables
+        shell: bash
         run: |
-          sudo mkdir -p /images
-          sudo chmod 777 /images
-      - name: Configure images folder for caching
-        uses: actions/cache@v2
+          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
+          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
+      - name: setup buildx instance
+        run: docker buildx create --use
+      - uses: crazy-max/ghaction-github-runtime@v2
+      - name: Build docker images for testing from cache
+        env:
+          DOCKER_ORG: ${{ env.DOCKER_ORG }}
+          MAILU_VERSION: ${{ env.MAILU_VERSION }}
+          PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+        uses: docker/bake-action@v2
         with:
-          path: /images
-          key: ${{ needs.derive-variables.outputs.BRANCH }}-${{ github.run_id }}-${{ github.run_number }}
-      - name: Load docker images
-        run: docker load -i /images/images.tar.gz
+          files: ${{env.HCL_FILE}}
+          load: true
+          push: false
+          set: |
+            *.cache-from=type=gha,scope=build-docs
+            *.cache-from=type=gha,scope=build-setup
+            *.cache-from=type=gha,scope=build-admin
+            *.cache-from=type=gha,scope=build-antispam
+            *.cache-from=type=gha,scope=build-front
+            *.cache-from=type=gha,scope=build-imap
+            *.cache-from=type=gha,scope=build-smtp
+            *.cache-from=type=gha,scope=build-rainloop
+            *.cache-from=type=gha,scope=build-roundcube
+            *.cache-from=type=gha,scope=build-antivirus
+            *.cache-from=type=gha,scope=build-fetchmail
+            *.cache-from=type=gha,scope=build-resolver
+            *.cache-from=type=gha,scope=build-traefik-certdumper
+            *.cache-from=type=gha,scope=build-webdav
+            *.platform=linux/amd64
       - name: Install python packages
         run: python3 -m pip install -r tests/requirements.txt
       - name: Copy all certs
         run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test core suite
-        run: python tests/compose/test.py core 2
+      - name: Test ${{ matrix.target }}
+        run: python tests/compose/test.py ${{ matrix.target }} 3
         env:
-          MAILU_VERSION: ${{ needs.derive-variables.outputs.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ needs.derive-variables.outputs.DOCKER_ORG }}
+          DOCKER_ORG: ${{ env.DOCKER_ORG }}
+          MAILU_VERSION: ${{ env.MAILU_VERSION }}
+          PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
 
-  test-fetchmail:
-    name: Perform fetchmail tests
-    runs-on: ubuntu-latest
-    needs:
-      - build
-      - derive-variables
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Create folder for storing images
-        run: |
-          sudo mkdir -p /images
-          sudo chmod 777 /images
-      - name: Configure images folder for caching
-        uses: actions/cache@v2
-        with:
-          path: /images
-          key: ${{ needs.derive-variables.outputs.BRANCH }}-${{ github.run_id }}-${{ github.run_number }}
-      - name: Load docker images
-        run: docker load -i /images/images.tar.gz
-      - name: Install python packages
-        run: python3 -m pip install -r tests/requirements.txt
-      - name: Copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test fetch
-        run: python tests/compose/test.py fetchmail 2
-        env:
-          MAILU_VERSION: ${{ needs.derive-variables.outputs.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ needs.derive-variables.outputs.DOCKER_ORG }}
-
-  test-filters:
-    name: Perform filter tests
-    runs-on: ubuntu-latest
-    needs:
-      - build
-      - derive-variables
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Create folder for storing images
-        run: |
-          sudo mkdir -p /images
-          sudo chmod 777 /images
-      - name: Configure images folder for caching
-        uses: actions/cache@v2
-        with:
-          path: /images
-          key: ${{ needs.derive-variables.outputs.BRANCH }}-${{ github.run_id }}-${{ github.run_number }}
-      - name: Load docker images
-        run: docker load -i /images/images.tar.gz
-      - name: Install python packages
-        run: python3 -m pip install -r tests/requirements.txt
-      - name: Copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test clamvav
-        run: python tests/compose/test.py filters 3
-        env:
-          MAILU_VERSION: ${{ needs.derive-variables.outputs.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ needs.derive-variables.outputs.DOCKER_ORG }}
-
-  test-rainloop:
-    name: Perform rainloop tests
-    runs-on: ubuntu-latest
-    needs:
-      - build
-      - derive-variables
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Create folder for storing images
-        run: |
-          sudo mkdir -p /images
-          sudo chmod 777 /images
-      - name: Configure images folder for caching
-        uses: actions/cache@v2
-        with:
-          path: /images
-          key: ${{ needs.derive-variables.outputs.BRANCH }}-${{ github.run_id }}-${{ github.run_number }}
-      - name: Load docker images
-        run: docker load -i /images/images.tar.gz
-      - name: Install python packages
-        run: python3 -m pip install -r tests/requirements.txt
-      - name: Copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test rainloop
-        run: python tests/compose/test.py rainloop 2
-        env:
-          MAILU_VERSION: ${{ needs.derive-variables.outputs.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ needs.derive-variables.outputs.DOCKER_ORG }}
-
-  test-roundcube:
-    name: Perform roundcube tests
-    runs-on: ubuntu-latest
-    needs:
-      - build
-      - derive-variables
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Create folder for storing images
-        run: |
-          sudo mkdir -p /images
-          sudo chmod 777 /images
-      - name: Configure images folder for caching
-        uses: actions/cache@v2
-        with:
-          path: /images
-          key: ${{ needs.derive-variables.outputs.BRANCH }}-${{ github.run_id }}-${{ github.run_number }}
-      - name: Load docker images
-        run: docker load -i /images/images.tar.gz
-      - name: Install python packages
-        run: python3 -m pip install -r tests/requirements.txt
-      - name: Copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test roundcube
-        run: python tests/compose/test.py roundcube 2
-        env:
-          MAILU_VERSION: ${{ needs.derive-variables.outputs.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ needs.derive-variables.outputs.DOCKER_ORG }}
-
-  test-webdav:
-    name: Perform webdav tests
-    runs-on: ubuntu-latest
-    needs:
-      - build
-      - derive-variables
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Create folder for storing images
-        run: |
-          sudo mkdir -p /images
-          sudo chmod 777 /images
-      - name: Configure images folder for caching
-        uses: actions/cache@v2
-        with:
-          path: /images
-          key: ${{ needs.derive-variables.outputs.BRANCH }}-${{ github.run_id }}-${{ github.run_number }}
-      - name: Load docker images
-        run: docker load -i /images/images.tar.gz
-      - name: Install python packages
-        run: python3 -m pip install -r tests/requirements.txt
-      - name: Copy all certs
-        run: sudo -- sh -c 'mkdir -p /mailu && cp -r tests/certs /mailu && chmod 600 /mailu/certs/*'
-      - name: Test webdav
-        run: python tests/compose/test.py webdav 2
-        env:
-          MAILU_VERSION: ${{ needs.derive-variables.outputs.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ needs.derive-variables.outputs.DOCKER_ORG }}
-
+# This job deploys the docker images to the docker repository. The build.hcl file contains logic that determines what tags are pushed.
+# E.g. for master only the :master and :latest tags are pushed.
   deploy:
     name: Deploy images
     # Deploying is not required for staging
-    if: ${{ needs.derive-variables.outputs.BRANCH }} != 'staging' }}
+    if: needs.derive-variables.outputs.BRANCH != 'staging'
     runs-on: ubuntu-latest
     needs:
       - derive-variables
       - build
-      - test-core
-      - test-fetchmail
-      - test-filters
-      - test-rainloop
-      - test-roundcube
-      - test-webdav
+      - tests
     steps:
       - uses: actions/checkout@v3
-        with:
-          # fetch-depth 0 is required to also retrieve all tags.
-          fetch-depth: 0
-      - name: Create folder for storing images
+      - name: Retrieve global variables
+        shell: bash
         run: |
-          sudo mkdir -p /images
-          sudo chmod 777 /images
-      - name: Configure images folder for caching
-        uses: actions/cache@v2
-        with:
-          path: /images
-          key: ${{ needs.derive-variables.outputs.BRANCH }}-${{ github.run_id }}-${{ github.run_number }}
-      - name: Load docker images
-        run: docker load -i /images/images.tar.gz
+          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
+          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       - name: Login to Docker Hub
@@ -365,40 +258,38 @@ jobs:
         with:
           username: ${{ secrets.Docker_Login }}
           password: ${{ secrets.Docker_Password }}
-      - name: Deploy images to docker hub for anything but master.
-        if:  ${{ needs.derive-variables.outputs.BRANCH }} != 'master' }}
-        uses: docker/bake-action@2.1.0
-        with:
-          files: tests/build.hcl
-          push: true
-          set: |
-            *.args.MAILU_VERSION=${{ needs.derive-variables.outputs.MAILU_VERSION }}
-            *.args.PINNED_MAILU_VERSION=${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
-            *.args.DOCKER_ORG=${{ needs.derive-variables.outputs.DOCKER_ORG }}
-      - name: Deploy images to docker hub for master. For master we ony push tag master
-        if: ${{ needs.derive-variables.outputs.BRANCH }} == 'master' }}
-        with:
-          files: tests/build.hcl
-          push: true
-          set: |
-            *.args.MAILU_VERSION=${{ needs.derive-variables.outputs.MAILU_VERSION }}
-            *.args.PINNED_MAILU_VERSION=${{ needs.derive-variables.outputs.MAILU_VERSION }}
-            *.args.DOCKER_ORG=${{ needs.derive-variables.outputs.DOCKER_ORG }}
-
-## must be replaced with docker actions ##
-      - name: Deploy built docker images
+      - uses: crazy-max/ghaction-github-runtime@v2
+      - name: setup buildx instance
+        run: docker buildx create --use
+      - name: Deploy images to docker hub. Build.hcl contains the logic for the tags that are pushed.
         env:
-          DOCKER_UN: ${{ secrets.Docker_Login }}
-          DOCKER_PW: ${{ secrets.Docker_Password }}
-          MAILU_VERSION: ${{ needs.derive-variables.outputs.MAILU_VERSION }}
-          PINNED_MAILU_VERSION: ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
-          DOCKER_ORG: ${{ needs.derive-variables.outputs.DOCKER_ORG }}
-          BRANCH: ${{ needs.derive-variables.outputs.BRANCH }}
-        run: bash tests/deploy.sh
-## END OF must be replaced with docker actions ##
+          DOCKER_ORG: ${{ env.DOCKER_ORG }}
+          MAILU_VERSION: ${{ env.MAILU_VERSION }}
+          PINNED_MAILU_VERSION: ${{ env.PINNED_MAILU_VERSION }}
+        uses: docker/bake-action@v2
+        with:
+          files: ${{env.HCL_FILE}}
+          push: true
+          set: |
+            *.cache-from=type=gha,scope=build-docs
+            *.cache-from=type=gha,scope=build-setup
+            *.cache-from=type=gha,scope=build-admin
+            *.cache-from=type=gha,scope=build-antispam
+            *.cache-from=type=gha,scope=build-front
+            *.cache-from=type=gha,scope=build-imap
+            *.cache-from=type=gha,scope=build-smtp
+            *.cache-from=type=gha,scope=build-rainloop
+            *.cache-from=type=gha,scope=build-roundcube
+            *.cache-from=type=gha,scope=build-antivirus
+            *.cache-from=type=gha,scope=build-fetchmail
+            *.cache-from=type=gha,scope=build-resolver
+            *.cache-from=type=gha,scope=build-traefik-certdumper
+            *.cache-from=type=gha,scope=build-webdav
+            *.platform=linux/amd64
 
+#This job creates a tagged release. A tag is created for the pinned version x.y.z. The GH release refers to this tag.
   tag-release:
-    if: ${{ needs.derive-variables.outputs.BRANCH }} != 'testing' && ${{ needs.derive-variables.outputs.BRANCH }} != 'staging' && ${{ needs.derive-variables.outputs.BRANCH }} != 'master' }}
+    if: needs.derive-variables.outputs.BRANCH != 'testing' && needs.derive-variables.outputs.BRANCH != 'staging' && needs.derive-variables.outputs.BRANCH != 'master'
     runs-on: ubuntu-latest
     needs:
       - deploy
@@ -408,24 +299,31 @@ jobs:
         with:
           # fetch-depth 0 is required to also retrieve all tags.
           fetch-depth: 0
+      - name: Retrieve global variables
+        shell: bash
+        run: |
+          echo "BRANCH=${{needs.setup.outputs.BRANCH}}" >> $GITHUB_ENV
+          echo "MAILU_VERSION=${{needs.setup.outputs.MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "PINNED_MAILU_VERSION=${{needs.setup.outputs.PINNED_MAILU_VERSION}}" >> $GITHUB_ENV
+          echo "DOCKER_ORG=${{needs.setup.outputs.DOCKER_ORG}}" >> $GITHUB_ENV
       - name: Create tag for branch x.y.
         shell: bash
         run: |
-          echo git tag ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }} $(/usr/bin/git rev-parse HEAD)
-          git tag ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }} $(/usr/bin/git rev-parse HEAD)
-          git push origin ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
+          echo git tag ${{ env.PINNED_MAILU_VERSION }} $(/usr/bin/git rev-parse HEAD)
+          git tag ${{ env.PINNED_MAILU_VERSION }} $(/usr/bin/git rev-parse HEAD)
+          git push origin ${{ env.PINNED_MAILU_VERSION }}
       - name: Create release for tag x.y.z.
         uses: ncipollo/release-action@v1
         with:
           bodyFile: "RELEASE_TEMPLATE.md"
-          tag: ${{ needs.derive-variables.outputs.PINNED_MAILU_VERSION }}
+          tag: ${{ env.PINNED_MAILU_VERSION }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
  # This job is watched by bors. It only complets if building,testing and deploy worked.
   ci-success:
     name: CI-Done
     #Returns true when none of the **previous** steps have failed or have been canceled.
-    if: ${{ success() }}
+    if: success()
     needs:
       - deploy
     runs-on: ubuntu-latest

@@ -64,7 +64,7 @@ target "defaults" {
 # Derive all tags
 function "tag" {
   params = [image_name]
-  result = [ "${DOCKER_ORG}/${DOCKER_PREFIX}${image_name}:${PINNED_MAILU_VERSION}",
+  result = [  notequal("master",MAILU_VERSION) ? "${DOCKER_ORG}/${DOCKER_PREFIX}${image_name}:${PINNED_MAILU_VERSION}": "",
              "${DOCKER_ORG}/${DOCKER_PREFIX}${image_name}:${MAILU_VERSION}",
              "${DOCKER_ORG}/${DOCKER_PREFIX}${image_name}:latest"
           ]
