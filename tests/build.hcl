@@ -90,6 +90,7 @@ function "tag" {
 target "base" {
   inherits = ["defaults"]
   context = "core/base/"
+  tags = tag("base")
 }
 
 target "assets" {
